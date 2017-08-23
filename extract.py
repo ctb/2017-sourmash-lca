@@ -97,6 +97,7 @@ def main():
     # it's from.
     print('loading signatures & traversing hashes')
     for n, filename in enumerate(args.sigs):
+        print('...', filename)
         sig = sourmash_lib.signature.load_one_signature(filename,
                                                       select_ksize=args.ksize)
         acc = sig.name().split(' ')[0]   # first part of sequence name
@@ -115,12 +116,14 @@ def main():
             lh.link_tag_and_label(m, n)
     print('...done')
 
-    print('traversing tags and finding last-common-ancestor')
+    print('traversing tags and finding last-common-ancestor for {} tags'.format(lh.n_tags()))
     cur_id = 1
     lineage_to_id = {}
     id_to_lineage = {}
     tag_to_lid = {}
     for n, tag in enumerate(lh.get_tagset()):
+        if n % 1000 == 0:
+            print('...', n)
         tag = lh.hash(tag)
 
         # get all of the accessions associated with this ID, & find associated

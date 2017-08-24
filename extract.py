@@ -44,12 +44,21 @@ TODO:
 * refactor this into two stages?
 * add --traverse-dir argument a la sourmash
 """
-
+import sys, os
 import sourmash_lib, sourmash_lib.signature
 import argparse
 from pickle import dump
 from collections import defaultdict
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
+
+
+def traverse_find_sigs(dirnames):
+    for dirname in dirnames:
+        for root, dirs, files in os.walk(dirname):
+            for name in files:
+                if name.endswith('.sig') or name.endswith('.sbt'):
+                    fullname = os.path.join(root, name)
+                    yield fullname
 
 
 def main():
@@ -59,6 +68,8 @@ def main():
     p.add_argument('sigs', nargs='+')
     p.add_argument('-k', '--ksize', default=31, type=int)
     p.add_argument('-s', '--savename', default=None, type=str)
+    p.add_argument('--traverse-directory', action='store_true')
+    p.add_argument('--scaled', default=None, type=int)
     args = p.parse_args()
 
     if not args.savename:
@@ -78,10 +89,15 @@ def main():
     hashval_to_taxids = defaultdict(set)
 
     # for every minhash in every signature, link it to its NCBI taxonomic ID.
+    if args.traverse_directory:
+        inp_files = list(traverse_find_sigs(args.sigs))
+    else:
+        inp_files = list(args.sigs)
+
     print('loading signatures & traversing hashes')
-    for n, filename in enumerate(args.sigs):
+    for n, filename in enumerate(inp_files):
         if n % 100 == 0:
-            print('... loading signature', n, end='\r')
+            print('... loading signature', n, 'of', len(inp_files), end='\r')
         sig = sourmash_lib.signature.load_one_signature(filename,
                                                       select_ksize=args.ksize)
         acc = sig.name().split(' ')[0]   # first part of sequence name
@@ -90,6 +106,9 @@ def main():
         taxid = taxfoo.get_taxid(acc)
         if taxid == None:
             continue
+
+        if args.scaled:
+            sig.minhash = sig.minhash.downsample_scaled(args.scaled)
 
         mins = sig.minhash.get_mins()
 

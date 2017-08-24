@@ -80,19 +80,22 @@ def main():
     # for every minhash in every signature, link it to its NCBI taxonomic ID.
     print('loading signatures & traversing hashes')
     for n, filename in enumerate(args.sigs):
-        if n % 10 == 1:
-            print('... on signature', n, 'of', filename)
+        if n % 100 == 0:
+            print('... loading signature', n, end='\r')
         sig = sourmash_lib.signature.load_one_signature(filename,
                                                       select_ksize=args.ksize)
         acc = sig.name().split(' ')[0]   # first part of sequence name
         acc = acc.split('.')[0]          # get acc w/o version
 
         taxid = taxfoo.get_taxid(acc)
+        if taxid == None:
+            continue
+
         mins = sig.minhash.get_mins()
 
         for m in mins:
             hashval_to_taxids[m].add(taxid)
-    print('...done')
+    print('\n...done')
 
     ####
 
@@ -100,22 +103,31 @@ def main():
 
     hashval_to_lca = {}
     found_root = 0
+    empty_set = 0
 
     # find the LCA for each hashval and store.
     for n, (hashval, taxid_set) in enumerate(hashval_to_taxids.items()):
-        if n % 1000 == 0:
-            print('...', n)
+        if n % 10000 == 0:
+            print('...', n, end='\r')
 
         # find associated least-common-ancestors.
         lca = taxfoo.find_lca(taxid_set)
 
         if lca == 1:
-            found_root += 1
+            if taxid_set:
+                found_root += 1
+            else:
+                empty_set += 1
+            continue
 
         # save!!
         hashval_to_lca[hashval] = lca
-    print('done')
-    print('found root {} times'.format(found_root))
+    print('\ndone')
+
+    if found_root:
+        print('found root {} times'.format(found_root))
+    if empty_set:
+        print('found empty set {} times'.format(empty_set))
 
     print('saving to', args.savename)
     dump(hashval_to_lca, open(args.savename, 'wb'))

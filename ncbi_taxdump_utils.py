@@ -28,7 +28,7 @@ class NCBI_TaxonomyFoo(object):
 
         info = self.accessions.get(acc)
         if not info:
-            return 1
+            return None
 
         taxid = info['taxid']
         taxid = int(taxid)

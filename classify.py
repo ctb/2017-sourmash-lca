@@ -18,19 +18,32 @@ Usage:
 import khmer
 import sourmash_lib, sourmash_lib.signature
 import argparse
-import gzip, csv
 from pickle import load
 import collections
+from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
+
+want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('nodes_dmp')
+    p.add_argument('names_dmp')
     p.add_argument('saved_db')
     p.add_argument('sigfile')
     p.add_argument('-k', '--ksize', default=31)
     args = p.parse_args()
 
-    (tag_to_lid, id_to_lineage, lineage_to_id) = load(open(args.saved_db, 'rb'))
+    taxfoo = NCBI_TaxonomyFoo()
+    
+    # load the nodes_dmp file to get the tax tree
+    print('loading nodes_dmp / taxonomic tree')
+    taxfoo.load_nodes_dmp(args.nodes_dmp)
+    taxfoo.load_names_dmp(args.names_dmp)
+    
+    print('loading k-mer DB')
+    hashval_to_lca = load(open(args.saved_db, 'rb'))
+    
     # load signature
     sig = sourmash_lib.signature.load_one_signature(args.sigfile,
                                                     select_ksize=args.ksize)
@@ -39,14 +52,16 @@ def main():
     cnt = collections.Counter()
 
     found = 0
-    for n, tag in enumerate(sig.minhash.get_mins()):
-        lid = tag_to_lid.get(tag)
-        if lid is None:
+    for n, hashval in enumerate(sig.minhash.get_mins()):
+        lca = hashval_to_lca.get(hashval)
+        if lca is None or lca == 1:
             continue
-        
-        lineage = id_to_lineage.get(lid)
-        if lineage is None:
-            continue
+
+        lineage_d = taxfoo.get_lineage(lca)
+        z = []
+        for t in want_taxonomy:
+            z.append(lineage_d.get(t, ''))
+        lineage = ";".join(z)
 
         found += 1
         cnt[lineage] += 1

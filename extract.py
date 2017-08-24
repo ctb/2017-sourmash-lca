@@ -36,13 +36,15 @@ faster, though no less memory intensive.
 import khmer
 import sourmash_lib, sourmash_lib.signature
 import argparse
-import gzip, csv
 from pickle import dump
+from collections import defaultdict
+from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('genbank_csv')
+    p.add_argument('nodes_dmp')
     p.add_argument('sigs', nargs='+')
     p.add_argument('-k', '--ksize', default=31)
     p.add_argument('-s', '--savename', default=None, type=str)
@@ -52,49 +54,19 @@ def main():
         print('no savename, quitting')
         sys.exit(0)
 
+    taxfoo = NCBI_TaxonomyFoo()
 
-    xopen = open
-    if args.genbank_csv.endswith('.gz'):
-        xopen = gzip.open
+    # load the accesions->taxid info
+    taxfoo.load_accessions_csv(args.genbank_csv)
 
-    # load the genbank CSV (accession -> lineage)
-    print('loading genbank accession -> lineage info')
-    with xopen(args.genbank_csv, 'rt') as fp:
-        accessions = {}
-        for row in csv.DictReader(fp, fieldnames=['acc', 'taxid', 'lineage']):
-            acc = row['acc']
-            accessions[acc] = row
+    # load the nodes_dmp file to get the tax tree
+    print('loading nodes_dmp / taxonomic tree')
+    taxfoo.load_nodes_dmp(args.nodes_dmp)
 
-    # code to find the last common ancestor from the lineage string
-    def find_lca(acc_list):
-        info_list = []
-        for acc in acc_list:
-            info = accessions.get(acc)
-            if info:
-                info_list.append(info['lineage'])
+    # track hashval -> set of taxids
+    hashval_to_taxids = defaultdict(set)
 
-        while 1:
-            lins = set(info_list)
-            if len(lins) <= 1:
-                if len(lins):
-                    return lins.pop()
-                else:
-                    return 'XXX'
-
-            new_list = []
-            for x in info_list:
-                new_list.append(x.rsplit(';', 1)[0])
-            info_list = new_list
-
-
-    # initialize a GraphLabels/labelhash data structure to track
-    # hashes -> taxonomic IDs.  We could use a dictionary/list here
-    # but I think it would not scale as well? Not sure.
-    lh = khmer.GraphLabels(args.ksize, 1, 1)
-    id_to_acc = {}
-
-    # for every minhash in every signature, link it to the taxonomic lineage
-    # it's from.
+    # for every minhash in every signature, link it to its NCBI taxonomic ID.
     print('loading signatures & traversing hashes')
     for n, filename in enumerate(args.sigs):
         print('...', filename)
@@ -106,50 +78,36 @@ def main():
         # @CTB hack hack split off NZ from accession
         if acc.startswith('NZ_'):
             acc = acc[3:]
-        
+
+        taxid = taxfoo.get_taxid(acc)
         mins = sig.minhash.get_mins()
 
-        id_to_acc[n] = acc
-
         for m in mins:
-            lh.add_tag(m)
-            lh.link_tag_and_label(m, n)
+            hashval_to_taxids[m].add(taxid)
     print('...done')
 
-    print('traversing tags and finding last-common-ancestor for {} tags'.format(lh.n_tags()))
-    cur_id = 1
-    lineage_to_id = {}
-    id_to_lineage = {}
-    tag_to_lid = {}
-    for n, tag in enumerate(lh.get_tagset()):
+    print('traversing tags and finding last-common-ancestor for {} tags'.format(len(hashval_to_taxids)))
+
+    hashval_to_lca = {}
+    found_root = 0
+    
+    for n, (hashval, taxid_set) in enumerate(hashval_to_taxids.items()):
         if n % 1000 == 0:
             print('...', n)
-        tag = lh.hash(tag)
 
-        # get all of the accessions associated with this ID, & find associated
-        # lineages.  We could probably move this into the loop above
-        # and go directly from hashes to lineages.
-        labels = lh.get_tag_labels(tag)
-        acc_list = [ id_to_acc[x] for x in labels ]
-        lca = find_lca(acc_list)
+        # find associated least-common-ancestors.
+        lca = taxfoo.find_lca(taxid_set)
 
-        # get the lineage_id of the lca if we know it --
-        lineage_id = lineage_to_id.get(lca)
-
-        # new lineage? add, and do bookkeeping.
-        if lineage_id == None:
-            lineage_id = cur_id
-            lineage_to_id[lca] = lineage_id
-            id_to_lineage[lineage_id] = lca
-            cur_id += 1
+        if lca == 1:
+            found_root += 1
 
         # save!!
-        tag_to_lid[tag] = lineage_id
+        hashval_to_lca[hashval] = lca
     print('done')
+    print('found root {} times'.format(found_root))
 
     print('saving to', args.savename)
-    dump((tag_to_lid, id_to_lineage, lineage_to_id),
-         open(args.savename, 'wb'))
+    dump(hashval_to_lca, open(args.savename, 'wb'))
 
 
 if __name__ == '__main__':

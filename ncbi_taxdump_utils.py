@@ -63,10 +63,8 @@ class NCBI_TaxonomyFoo(object):
             return path[-1]
         return 1
 
-    def get_lineage(self, taxid):
+    def get_lineage(self, taxid, want_taxonomy=None):
         taxid = int(taxid)
-
-        d = {}
 
         lineage = []
         while taxid != 1:
@@ -74,10 +72,12 @@ class NCBI_TaxonomyFoo(object):
                 print('cannot find taxid {}; quitting.'.format(taxid))
                 break
             rank = self.node_to_info[taxid][0]
-            d[rank] = self.taxid_to_names[taxid][0]
+            name = self.taxid_to_names[taxid][0]
+            if not want_taxonomy or rank in want_taxonomy:
+                lineage.insert(0, name)
             taxid = self.child_to_parent[taxid]
 
-        return d
+        return lineage
 
 
 ### internal utility functions

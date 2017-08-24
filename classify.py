@@ -19,6 +19,11 @@ NCBI's taxdump.tar.gz --
 
     curl -O -L ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
     tar xzf taxdump.tar.gz nodes.dmp names.dmp
+
+TODO:
+
+* add classification of FASTA/FASTQ?
+* worry about --scaled factors here and in extract.
 """
 
 import khmer
@@ -54,20 +59,18 @@ def main():
     sig = sourmash_lib.signature.load_one_signature(args.sigfile,
                                                     select_ksize=args.ksize)
 
-    # for every hash, print out LCA of labels
     cnt = collections.Counter()
-
     found = 0
+
+    # for every hash, print out LCA of labels
     for n, hashval in enumerate(sig.minhash.get_mins()):
         lca = hashval_to_lca.get(hashval)
         if lca is None or lca == 1:
             continue
 
-        lineage_d = taxfoo.get_lineage(lca)
-        z = []
-        for t in want_taxonomy:
-            z.append(lineage_d.get(t, ''))
-        lineage = ";".join(z)
+        # extract the full lineage & format ~nicely
+        lineage = taxfoo.get_lineage(lca)
+        lineage = ";".join(lineage)
 
         found += 1
         cnt[lineage] += 1

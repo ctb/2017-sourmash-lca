@@ -36,9 +36,15 @@ This could be pretty easily broken down into multiple steps:
 
 This would make adding in new organisms to the LCA database much
 faster, though no less memory intensive.
+
+----
+
+TODO:
+
+* refactor this into two stages?
+* add --traverse-dir argument a la sourmash
 """
 
-import khmer
 import sourmash_lib, sourmash_lib.signature
 import argparse
 from pickle import dump
@@ -51,7 +57,7 @@ def main():
     p.add_argument('genbank_csv')
     p.add_argument('nodes_dmp')
     p.add_argument('sigs', nargs='+')
-    p.add_argument('-k', '--ksize', default=31)
+    p.add_argument('-k', '--ksize', default=31, type=int)
     p.add_argument('-s', '--savename', default=None, type=str)
     args = p.parse_args()
 
@@ -74,7 +80,8 @@ def main():
     # for every minhash in every signature, link it to its NCBI taxonomic ID.
     print('loading signatures & traversing hashes')
     for n, filename in enumerate(args.sigs):
-        print('...', filename)
+        if n % 10 == 1:
+            print('... on signature', n, 'of', filename)
         sig = sourmash_lib.signature.load_one_signature(filename,
                                                       select_ksize=args.ksize)
         acc = sig.name().split(' ')[0]   # first part of sequence name
@@ -87,11 +94,14 @@ def main():
             hashval_to_taxids[m].add(taxid)
     print('...done')
 
+    ####
+
     print('traversing tags and finding last-common-ancestor for {} tags'.format(len(hashval_to_taxids)))
 
     hashval_to_lca = {}
     found_root = 0
-    
+
+    # find the LCA for each hashval and store.
     for n, (hashval, taxid_set) in enumerate(hashval_to_taxids.items()):
         if n % 1000 == 0:
             print('...', n)

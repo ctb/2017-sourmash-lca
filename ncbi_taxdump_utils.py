@@ -45,7 +45,7 @@ class NCBI_TaxonomyFoo(object):
         path = []
         while taxid != 1:
             path.insert(0, taxid)
-            taxid = self.child_to_parent[taxid]
+            taxid = self.child_to_parent.get(taxid, 1)   # @CTB reexamine
 
         # find the first shared taxid in each follow-on path
         while acc_set:

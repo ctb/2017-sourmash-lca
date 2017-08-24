@@ -95,11 +95,21 @@ def main():
         inp_files = list(args.sigs)
 
     print('loading signatures & traversing hashes')
+    bad_input = 0
     for n, filename in enumerate(inp_files):
         if n % 100 == 0:
-            print('... loading signature', n, 'of', len(inp_files), end='\r')
-        sig = sourmash_lib.signature.load_one_signature(filename,
+            print('... loading file #', n, 'of', len(inp_files), end='\r')
+
+        try:
+            sig = sourmash_lib.signature.load_one_signature(filename,
                                                       select_ksize=args.ksize)
+        except (FileNotFoundError, ValueError):
+            if not args.traverse_directory:
+                raise
+
+            bad_input += 1
+            continue
+
         acc = sig.name().split(' ')[0]   # first part of sequence name
         acc = acc.split('.')[0]          # get acc w/o version
 
@@ -115,6 +125,9 @@ def main():
         for m in mins:
             hashval_to_taxids[m].add(taxid)
     print('\n...done')
+    if bad_input:
+        print('failed to load {} of {} files found'.format(bad_input,
+                                                           len(inp_files)))
 
     with open(args.savename + '.hashvals', 'wb') as hashval_fp:
         dump(hashval_to_taxids, hashval_fp)

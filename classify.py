@@ -26,7 +26,6 @@ TODO:
 * worry about --scaled factors here and in extract.
 """
 
-import khmer
 import sourmash_lib, sourmash_lib.signature
 import argparse
 from pickle import load

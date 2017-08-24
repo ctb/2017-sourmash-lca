@@ -55,7 +55,7 @@ class NCBI_TaxonomyFoo(object):
             while taxid != 1:
                 if taxid in path:
                     path2.insert(0, taxid)
-                taxid = self.child_to_parent[taxid]
+                taxid = self.child_to_parent.get(taxid, 1)
 
             path = path2
 

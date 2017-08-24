@@ -43,11 +43,12 @@ TODO:
 
 * refactor this into two stages?
 * add --traverse-dir argument a la sourmash
+* check on kraken/kaiju output, see what else I should be doing
 """
 import sys, os
 import sourmash_lib, sourmash_lib.signature
 import argparse
-from pickle import dump
+from pickle import dump, load
 from collections import defaultdict
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
@@ -68,6 +69,7 @@ def main():
     p.add_argument('sigs', nargs='+')
     p.add_argument('-k', '--ksize', default=31, type=int)
     p.add_argument('-s', '--savename', default=None, type=str)
+    p.add_argument('-l', '--load-hashvals', action='store_true')
     p.add_argument('--traverse-directory', action='store_true')
     p.add_argument('--scaled', default=None, type=int)
     args = p.parse_args()
@@ -94,43 +96,50 @@ def main():
     else:
         inp_files = list(args.sigs)
 
-    print('loading signatures & traversing hashes')
-    bad_input = 0
-    for n, filename in enumerate(inp_files):
-        if n % 100 == 0:
-            print('... loading file #', n, 'of', len(inp_files), end='\r')
+    if args.load_hashvals:
+        with open(args.savename + '.hashvals', 'rb') as hashval_fp:
+            print('loading hashvals dict per -l/--load-hashvals...')
+            hashval_to_taxids = load(hashval_fp)
+            print('loaded {} hashvals'.format(len(hashval_to_taxids)))
+    else:
 
-        try:
-            sig = sourmash_lib.signature.load_one_signature(filename,
-                                                      select_ksize=args.ksize)
-        except (FileNotFoundError, ValueError):
-            if not args.traverse_directory:
-                raise
+        print('loading signatures & traversing hashes')
+        bad_input = 0
+        for n, filename in enumerate(inp_files):
+            if n % 100 == 0:
+                print('... loading file #', n, 'of', len(inp_files), end='\r')
 
-            bad_input += 1
-            continue
+            try:
+                sig = sourmash_lib.signature.load_one_signature(filename,
+                                                          select_ksize=args.ksize)
+            except (FileNotFoundError, ValueError):
+                if not args.traverse_directory:
+                    raise
 
-        acc = sig.name().split(' ')[0]   # first part of sequence name
-        acc = acc.split('.')[0]          # get acc w/o version
+                bad_input += 1
+                continue
 
-        taxid = taxfoo.get_taxid(acc)
-        if taxid == None:
-            continue
+            acc = sig.name().split(' ')[0]   # first part of sequence name
+            acc = acc.split('.')[0]          # get acc w/o version
 
-        if args.scaled:
-            sig.minhash = sig.minhash.downsample_scaled(args.scaled)
+            taxid = taxfoo.get_taxid(acc)
+            if taxid == None:
+                continue
 
-        mins = sig.minhash.get_mins()
+            if args.scaled:
+                sig.minhash = sig.minhash.downsample_scaled(args.scaled)
 
-        for m in mins:
-            hashval_to_taxids[m].add(taxid)
-    print('\n...done')
-    if bad_input:
-        print('failed to load {} of {} files found'.format(bad_input,
-                                                           len(inp_files)))
+            mins = sig.minhash.get_mins()
 
-    with open(args.savename + '.hashvals', 'wb') as hashval_fp:
-        dump(hashval_to_taxids, hashval_fp)
+            for m in mins:
+                hashval_to_taxids[m].add(taxid)
+        print('\n...done')
+        if bad_input:
+            print('failed to load {} of {} files found'.format(bad_input,
+                                                               len(inp_files)))
+
+        with open(args.savename + '.hashvals', 'wb') as hashval_fp:
+            dump(hashval_to_taxids, hashval_fp)
 
     ####
 

@@ -116,6 +116,9 @@ def main():
             hashval_to_taxids[m].add(taxid)
     print('\n...done')
 
+    with open(args.savename + '.hashvals', 'wb') as hashval_fp:
+        dump(hashval_to_taxids, hashval_fp)
+
     ####
 
     print('traversing tags and finding last-common-ancestor for {} tags'.format(len(hashval_to_taxids)))

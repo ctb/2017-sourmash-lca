@@ -15,11 +15,16 @@ Briefly,
 
 Usage::
 
-   kraken/extract.py genbank/*.csv.gz ecoli_many_sigs/ecoli-*.sig --savename foobar
+   kraken/extract.py genbank/*.csv.gz nodes.dmp ecoli_many_sigs/ecoli-*.sig --savename foobar
 
 The E. coli signatures used in the command above can be downloaded like so:
 
    curl -O -L https://github.com/dib-lab/sourmash/raw/master/data/eschericia-sigs.tar.gz
+
+'nodes.dmp' comes from 'taxdump.tar.gz' --
+
+    curl -O -L ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+    tar xzf taxdump.tar.gz nodes.dmp names.dmp
 
 ----
 
@@ -74,10 +79,6 @@ def main():
                                                       select_ksize=args.ksize)
         acc = sig.name().split(' ')[0]   # first part of sequence name
         acc = acc.split('.')[0]          # get acc w/o version
-
-        # @CTB hack hack split off NZ from accession
-        if acc.startswith('NZ_'):
-            acc = acc[3:]
 
         taxid = taxfoo.get_taxid(acc)
         mins = sig.minhash.get_mins()

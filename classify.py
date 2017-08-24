@@ -12,7 +12,13 @@ Briefly,
 
 Usage:
 
-   kraken/classify.py foobar ecoli_many_sigs/ecoli-1.sig
+   kraken/classify.py nodes.dmp names.dmp foobar ecoli_many_sigs/ecoli-1.sig
+
+where 'foobar' is the --savename from extract.py, and nodes/names.dmp are from
+NCBI's taxdump.tar.gz --
+
+    curl -O -L ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+    tar xzf taxdump.tar.gz nodes.dmp names.dmp
 """
 
 import khmer

@@ -22,6 +22,10 @@ class NCBI_TaxonomyFoo(object):
 
     # get taxid
     def get_taxid(self, acc):
+        # @CTB hack hack split off NZ from accession
+        if acc.startswith('NZ_'):
+            acc = acc[3:]
+
         info = self.accessions.get(acc)
         if not info:
             return 1

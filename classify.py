@@ -32,6 +32,8 @@ from pickle import load
 import collections
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
+SCALED=10000                              # should match the LCA compute @CTB
+
 kraken_rank_code = {
     'genus' : 'G',
     'species': 'S',
@@ -55,16 +57,18 @@ def main():
     taxfoo = NCBI_TaxonomyFoo()
     
     # load the nodes_dmp file to get the tax tree
-    print('loading nodes_dmp / taxonomic tree')
+    print('loading taxonomic nodes from:', args.nodes_dmp)
     taxfoo.load_nodes_dmp(args.nodes_dmp)
+    print('loading taxonomic names from:', args.names_dmp)
     taxfoo.load_names_dmp(args.names_dmp)
     
-    print('loading k-mer DB')
+    print('loading k-mer DB from:', args.saved_db)
     hashval_to_lca = load(open(args.saved_db, 'rb'))
     
     # load signature
     sig = sourmash_lib.signature.load_one_signature(args.sigfile,
                                                     select_ksize=args.ksize)
+    sig.minhash = sig.minhash.downsample_scaled(SCALED)
 
     found = 0
     by_taxid = collections.defaultdict(int)
@@ -72,7 +76,7 @@ def main():
     # for every hash, print out LCA of labels
     for n, hashval in enumerate(sig.minhash.get_mins()):
         lca = hashval_to_lca.get(hashval)
-        if lca is None or lca == 1:
+        if lca is None:
             by_taxid[0] += 1
             continue
 
@@ -80,6 +84,7 @@ def main():
         found += 1
 
     print('found LCA classifications for', found, 'of', n + 1, 'hashes')
+    not_found = n + 1 - found
 
     # now, propogate counts up the taxonomic tree.
     by_taxid_lca = collections.defaultdict(int)
@@ -107,6 +112,17 @@ def main():
         classify_code = kraken_rank_code.get(rank, '-')
 
         name = taxfoo.taxid_to_names[taxid][0]
+
+        print('{}\t{}\t{}\t{}\t{}\t{}'.format(percent, count_below, count_at,
+                                              classify_code, taxid, name))
+
+    if not_found:
+        classify_code = 'U'
+        percent = round(100 * not_found / total_count, 2)
+        count_below = not_found
+        count_at = not_found
+        taxid = 0
+        name = 'not classified'
 
         print('{}\t{}\t{}\t{}\t{}\t{}'.format(percent, count_below, count_at,
                                               classify_code, taxid, name))

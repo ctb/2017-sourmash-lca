@@ -72,7 +72,6 @@ def main():
         sigs = sourmash_lib.signature.load_signatures(sigfile,
                                                       select_ksize=args.ksize)
         sigs = list(sigs)
-        print('XXX', sigfile, args.ksize, len(sigs))
         siglist.extend(sigs)
 
     print('loaded {} signatures total at k={}'.format(len(siglist), args.ksize))
@@ -110,6 +109,8 @@ def main():
     # now, propogate counts up the taxonomic tree.
     by_taxid_lca = collections.defaultdict(int)
     for taxid, count in by_taxid.items():
+        by_taxid_lca[taxid] += count
+
         parent = taxfoo.child_to_parent.get(taxid)
         while parent != None and parent != 1:
             by_taxid_lca[parent] += count
@@ -131,10 +132,18 @@ def main():
         percent = round(100 * count_below / total_count, 2)
         count_at = by_taxid[taxid]
 
-        rank = taxfoo.node_to_info[taxid][0]
-        classify_code = kraken_rank_code.get(rank, '-')
+        rank = taxfoo.node_to_info.get(taxid)
+        if rank:
+            rank = rank[0]
+            classify_code = kraken_rank_code.get(rank, '-')
+        else:
+            classify_code = '-'
 
-        name = taxfoo.taxid_to_names[taxid][0]
+        name = taxfoo.taxid_to_names.get(taxid)
+        if name:
+            name = name[0]
+        else:
+            name = '-'
 
         print('{}\t{}\t{}\t{}\t{}\t{}'.format(percent, count_below, count_at,
                                               classify_code, taxid, name))

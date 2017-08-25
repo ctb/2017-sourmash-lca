@@ -1,8 +1,13 @@
+"""
+Utilities to deal with NCBI taxonomic foo.
+"""
+
 import gzip
 import csv
 
 
 want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
+
 
 class NCBI_TaxonomyFoo(object):
     def __init__(self):
@@ -64,6 +69,9 @@ class NCBI_TaxonomyFoo(object):
         return 1
 
     def get_lineage(self, taxid, want_taxonomy=None):
+        """
+        Extract the text taxonomic lineage in order (kingdom on down)
+        """
         taxid = int(taxid)
 
         lineage = []
@@ -103,9 +111,10 @@ def parse_nodes(filename):
     return child_to_parent, node_to_info
 
 
-
-
 def parse_names(filename):
+    """
+    Parse an NCBI names.dmp file.
+    """
     taxid_to_names = dict()
     with open(filename) as fp:
         for n, line in enumerate(fp):
@@ -122,6 +131,12 @@ def parse_names(filename):
 
 
 def load_genbank_accessions_csv(filename):
+    """
+    Load a file containing genbank accession -> taxid + lineage string.
+
+    See https://github.com/dib-lab/2017-ncbi-taxdump for scripts to create
+    this file from a large collection of sequences.
+    """
     xopen = open
     if filename.endswith('.gz'):
         xopen = gzip.open

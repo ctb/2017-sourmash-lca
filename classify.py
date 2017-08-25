@@ -32,8 +32,16 @@ from pickle import load
 import collections
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
-
-want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
+kraken_rank_code = {
+    'genus' : 'G',
+    'species': 'S',
+    'phylum': 'P',
+    'class': 'C',
+    'order': 'O',
+    'family': 'F',
+    'genus': 'G',
+    'kingdom': 'K',
+    'domain': 'D' }
 
 def main():
     p = argparse.ArgumentParser()
@@ -58,25 +66,50 @@ def main():
     sig = sourmash_lib.signature.load_one_signature(args.sigfile,
                                                     select_ksize=args.ksize)
 
-    cnt = collections.Counter()
     found = 0
+    by_taxid = collections.defaultdict(int)
 
     # for every hash, print out LCA of labels
     for n, hashval in enumerate(sig.minhash.get_mins()):
         lca = hashval_to_lca.get(hashval)
         if lca is None or lca == 1:
+            by_taxid[0] += 1
             continue
 
-        # extract the full lineage & format ~nicely
-        lineage = taxfoo.get_lineage(lca)
-        lineage = ";".join(lineage)
-
+        by_taxid[lca] += 1
         found += 1
-        cnt[lineage] += 1
 
-    print('found database classifications for', found, 'of', n + 1, 'hashes')
-    for item, count in cnt.most_common():
-        print(count, item)
+    print('found LCA classifications for', found, 'of', n + 1, 'hashes')
+
+    # now, propogate counts up the taxonomic tree.
+    by_taxid_lca = collections.defaultdict(int)
+    for taxid, count in by_taxid.items():
+        parent = taxfoo.child_to_parent.get(taxid)
+        while parent != None and parent != 1:
+            by_taxid_lca[parent] += count
+            parent = taxfoo.child_to_parent.get(parent)
+
+    total_count = sum(by_taxid.values())
+
+    # sort by lineage length
+    x = []
+    for taxid, count in by_taxid_lca.items():
+        x.append((len(taxfoo.get_lineage(taxid)), taxid, count))
+
+    x.sort()
+
+    # ...aaaaaand output.
+    for _, taxid, count_below in x:
+        percent = round(100 * count_below / total_count, 2)
+        count_at = by_taxid[taxid]
+
+        rank = taxfoo.node_to_info[taxid][0]
+        classify_code = kraken_rank_code.get(rank, '-')
+
+        name = taxfoo.taxid_to_names[taxid][0]
+
+        print('{}\t{}\t{}\t{}\t{}\t{}'.format(percent, count_below, count_at,
+                                              classify_code, taxid, name))
 
 
 if __name__ == '__main__':

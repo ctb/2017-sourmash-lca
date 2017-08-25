@@ -50,8 +50,8 @@ def main():
     p.add_argument('nodes_dmp')
     p.add_argument('names_dmp')
     p.add_argument('saved_db')
-    p.add_argument('sigfile')
-    p.add_argument('-k', '--ksize', default=31)
+    p.add_argument('sigfiles', nargs='+')
+    p.add_argument('-k', '--ksize', default=31, type=int)
     args = p.parse_args()
 
     taxfoo = NCBI_TaxonomyFoo()
@@ -65,26 +65,47 @@ def main():
     print('loading k-mer DB from:', args.saved_db)
     hashval_to_lca = load(open(args.saved_db, 'rb'))
     
-    # load signature
-    sig = sourmash_lib.signature.load_one_signature(args.sigfile,
-                                                    select_ksize=args.ksize)
-    sig.minhash = sig.minhash.downsample_scaled(SCALED)
+    # load signatures
+    siglist = []
+    print('loading signatures from {} signature files'.format(len(args.sigfiles)))
+    for sigfile in args.sigfiles:
+        sigs = sourmash_lib.signature.load_signatures(sigfile,
+                                                      select_ksize=args.ksize)
+        sigs = list(sigs)
+        print('XXX', sigfile, args.ksize, len(sigs))
+        siglist.extend(sigs)
+
+    print('loaded {} signatures total at k={}'.format(len(siglist), args.ksize))
+
+    # downsample
+    print('downsampling to scaled value: {}'.format(SCALED))
+    for sig in siglist:
+        sig.minhash = sig.minhash.downsample_scaled(SCALED)
+
+    # now, extract hash values!
+    hashvals = collections.defaultdict(int)
+    for sig in siglist:
+        for hashval in sig.minhash.get_mins():
+            hashvals[hashval] += 1
 
     found = 0
+    total = 0
     by_taxid = collections.defaultdict(int)
 
-    # for every hash, print out LCA of labels
-    for n, hashval in enumerate(sig.minhash.get_mins()):
+    # for every hash, get LCA of labels
+    for hashval, count in hashvals.items():
         lca = hashval_to_lca.get(hashval)
+        total += count
+
         if lca is None:
-            by_taxid[0] += 1
+            by_taxid[0] += count
             continue
 
-        by_taxid[lca] += 1
-        found += 1
+        by_taxid[lca] += count
+        found += count
 
-    print('found LCA classifications for', found, 'of', n + 1, 'hashes')
-    not_found = n + 1 - found
+    print('found LCA classifications for', found, 'of', total, 'hashes')
+    not_found = total - found
 
     # now, propogate counts up the taxonomic tree.
     by_taxid_lca = collections.defaultdict(int)
@@ -104,6 +125,8 @@ def main():
     x.sort()
 
     # ...aaaaaand output.
+    print('{}\t{}\t{}\t{}\t{}\t{}'.format('percent', 'below', 'at node',
+                                          'code', 'taxid', 'name'))
     for _, taxid, count_below in x:
         percent = round(100 * count_below / total_count, 2)
         count_at = by_taxid[taxid]

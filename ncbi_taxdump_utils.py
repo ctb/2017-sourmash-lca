@@ -4,6 +4,8 @@ Utilities to deal with NCBI taxonomic foo.
 
 import gzip
 import csv
+import os
+from pickle import dump, load
 
 
 want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
@@ -16,11 +18,32 @@ class NCBI_TaxonomyFoo(object):
         self.taxid_to_names = None
         self.accessions = None
 
-    def load_nodes_dmp(self, filename):
-        self.child_to_parent, self.node_to_info = parse_nodes(filename)
+    def load_nodes_dmp(self, filename, do_save_cache=True):
+        cache_file = filename + '.cache'
+        if os.path.exists(cache_file):
+            with open(cache_file, 'rb') as cache_fp:
+                self.child_to_parent, self.node_to_info = load(cache_fp)
+        else:
+            self.child_to_parent, self.node_to_info = parse_nodes(filename)
+            if do_save_cache:
+                self.save_nodes_cache(cache_file)
 
-    def load_names_dmp(self, filename):
-        self.taxid_to_names = parse_names(filename)
+    def save_nodes_cache(self, cache_file):
+        with open(cache_file, 'wb') as cache_fp:
+            dump((self.child_to_parent, self.node_to_info), cache_fp)
+
+    def load_names_dmp(self, filename, do_save_cache=True):
+        cache_file = filename + '.cache'
+        if os.path.exists(cache_file):
+            with open(cache_file, 'rb') as cache_fp:
+                self.taxid_to_names = load(cache_fp)
+        else:
+            self.taxid_to_names = parse_names(filename)
+            self.save_names_cache(cache_file)
+
+    def save_names_cache(self, cache_file):
+        with open(cache_file, 'wb') as cache_fp:
+            dump(self.taxid_to_names, cache_fp)
 
     def load_accessions_csv(self, filename):
         self.accessions = load_genbank_accessions_csv(filename)

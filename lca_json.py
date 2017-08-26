@@ -10,6 +10,10 @@ class LCA_Database(object):
     def __init__(self, filename=None):
         if filename:
             self.load(filename)
+        else:
+            self.lca = {}
+            self.lca['version'] = 1
+            self.lca['dblist'] = []
 
     def load(self, filename):
         with xopen(filename, 'rt') as json_fp:
@@ -35,7 +39,7 @@ class LCA_Database(object):
         db_info['nodes'] = nodes_path
         db_info['names'] = names_path
 
-        self.lca.dblist.append(db_info)
+        self.lca['dblist'].append(db_info)
 
     def get_database(self, ksize, scaled):
         lca_info = self.lca

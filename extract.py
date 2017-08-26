@@ -50,6 +50,8 @@ import sourmash_lib, sourmash_lib.signature
 import argparse
 from pickle import dump, load
 from collections import defaultdict
+
+import lca_json
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 
 
@@ -64,23 +66,24 @@ def traverse_find_sigs(dirnames):
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('lca_output')
     p.add_argument('genbank_csv')
     p.add_argument('nodes_dmp')
     p.add_argument('sigs', nargs='+')
     p.add_argument('-k', '--ksize', default=31, type=int)
-    p.add_argument('-s', '--savename', default=None, type=str)
-    p.add_argument('-l', '--load-hashvals', action='store_true')
-    p.add_argument('--traverse-directory', action='store_true')
-    p.add_argument('--scaled', default=None, type=int)
-    args = p.parse_args()
+    p.add_argument('--scaled', default=10000, type=int)
 
-    if not args.savename:
-        print('no savename, quitting')
-        sys.exit(0)
+    p.add_argument('--traverse-directory', action='store_true')
+
+    p.add_argument('-l', '--load-hashvals', action='store_true')
+
+    p.add_argument('--lca-json')
+    p.add_argument('--names-dmp', default='')
+    args = p.parse_args()
 
     taxfoo = NCBI_TaxonomyFoo()
 
-    # load the accesions->taxid info
+    # load the accessions->taxid info
     taxfoo.load_accessions_csv(args.genbank_csv)
 
     # load the nodes_dmp file to get the tax tree
@@ -97,7 +100,7 @@ def main():
         inp_files = list(args.sigs)
 
     if args.load_hashvals:
-        with open(args.savename + '.hashvals', 'rb') as hashval_fp:
+        with open(args.lca_output + '.hashvals', 'rb') as hashval_fp:
             print('loading hashvals dict per -l/--load-hashvals...')
             hashval_to_taxids = load(hashval_fp)
             print('loaded {} hashvals'.format(len(hashval_to_taxids)))
@@ -126,8 +129,7 @@ def main():
             if taxid == None:
                 continue
 
-            if args.scaled:
-                sig.minhash = sig.minhash.downsample_scaled(args.scaled)
+            sig.minhash = sig.minhash.downsample_scaled(args.scaled)
 
             mins = sig.minhash.get_mins()
 
@@ -138,7 +140,7 @@ def main():
             print('failed to load {} of {} files found'.format(bad_input,
                                                                len(inp_files)))
 
-        with open(args.savename + '.hashvals', 'wb') as hashval_fp:
+        with open(args.lca_output + '.hashvals', 'wb') as hashval_fp:
             dump(hashval_to_taxids, hashval_fp)
 
     ####
@@ -173,8 +175,37 @@ def main():
     if empty_set:
         print('found empty set {} times'.format(empty_set))
 
-    print('saving to', args.savename)
-    dump(hashval_to_lca, open(args.savename, 'wb'))
+    print('saving to', args.lca_output)
+    with lca_json.xopen(args.lca_output, 'wb') as lca_fp:
+        dump(hashval_to_lca, lca_fp)
+
+    # update LCA DB JSON file if provided
+    if args.lca_json:
+        lca_db = lca_json.LCA_Database()
+        if os.path.exists(args.lca_json):
+            print('loading LCA JSON file:', args.lca_json)
+            lca_db.load(args.lca_json)
+
+        prefix = os.path.dirname(args.lca_json) + '/'
+
+        lca_output = args.lca_output
+        if lca_output.startswith(prefix):
+            lca_output = lca_output[len(prefix):]
+
+        nodes_dmp = args.nodes_dmp
+        if nodes_dmp.startswith(prefix):
+            nodes_dmp = nodes_dmp[len(prefix):]
+
+        names_dmp = args.names_dmp
+        if names_dmp:
+            if names_dmp.startswith(prefix):
+                names_dmp = names_dmp[len(prefix):]
+        else:
+            names_dmp = nodes_dmp.replace('nodes', 'names')
+
+        lca_db.add_db(args.ksize, args.scaled, lca_output, nodes_dmp, names_dmp)
+        print('saving LCA JSON file:', args.lca_json)
+        lca_db.save(args.lca_json)
 
 
 if __name__ == '__main__':

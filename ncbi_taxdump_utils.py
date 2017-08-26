@@ -21,7 +21,7 @@ class NCBI_TaxonomyFoo(object):
     def load_nodes_dmp(self, filename, do_save_cache=True):
         cache_file = filename + '.cache'
         if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as cache_fp:
+            with xopen(cache_file, 'rb') as cache_fp:
                 self.child_to_parent, self.node_to_info = load(cache_fp)
         else:
             self.child_to_parent, self.node_to_info = parse_nodes(filename)
@@ -29,20 +29,20 @@ class NCBI_TaxonomyFoo(object):
                 self.save_nodes_cache(cache_file)
 
     def save_nodes_cache(self, cache_file):
-        with open(cache_file, 'wb') as cache_fp:
+        with xopen(cache_file, 'wb') as cache_fp:
             dump((self.child_to_parent, self.node_to_info), cache_fp)
 
     def load_names_dmp(self, filename, do_save_cache=True):
         cache_file = filename + '.cache'
         if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as cache_fp:
+            with xopen(cache_file, 'rb') as cache_fp:
                 self.taxid_to_names = load(cache_fp)
         else:
             self.taxid_to_names = parse_names(filename)
             self.save_names_cache(cache_file)
 
     def save_names_cache(self, cache_file):
-        with open(cache_file, 'wb') as cache_fp:
+        with xopen(cache_file, 'wb') as cache_fp:
             dump(self.taxid_to_names, cache_fp)
 
     def load_accessions_csv(self, filename):
@@ -112,14 +112,17 @@ class NCBI_TaxonomyFoo(object):
 
 
 ### internal utility functions
-        
+def xopen(filename, mode):
+    if filename.endswith('.gz'):
+        return gzip.open(filename, mode)
+    return open(filename, mode)
 
 def parse_nodes(filename):
     "Parse the NCBI nodes_dmp file."
     child_to_parent = dict()
     node_to_info = dict()
 
-    with open(filename) as fp:
+    with xopen(filename, 'rt') as fp:
         for n, line in enumerate(fp):
             x = line.split('\t|\t')
 
@@ -139,7 +142,7 @@ def parse_names(filename):
     Parse an NCBI names.dmp file.
     """
     taxid_to_names = dict()
-    with open(filename) as fp:
+    with xopen(filename, 'rt') as fp:
         for n, line in enumerate(fp):
             line = line.rstrip('\t|\n')
             x = line.split('\t|\t')
@@ -160,10 +163,6 @@ def load_genbank_accessions_csv(filename):
     See https://github.com/dib-lab/2017-ncbi-taxdump for scripts to create
     this file from a large collection of sequences.
     """
-    xopen = open
-    if filename.endswith('.gz'):
-        xopen = gzip.open
-
     # load the genbank CSV (accession -> lineage)
     print('loading genbank accession -> lineage info')
     with xopen(filename, 'rt') as fp:

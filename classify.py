@@ -32,6 +32,7 @@ import collections
 from ncbi_taxdump_utils import NCBI_TaxonomyFoo
 import os
 import json
+import gzip
 
 SCALED=10000                              # should match the LCA compute @CTB
 
@@ -46,9 +47,14 @@ kraken_rank_code = {
     'kingdom': 'K',
     'domain': 'D' }
 
+def xopen(filename, mode):
+    if filename.endswith('.gz'):
+        return gzip.open(filename, mode)
+    return open(filename, mode)
+
 
 def load_lca_json(filename):
-    with open(filename, 'rt') as json_fp:
+    with xopen(filename, 'rt') as json_fp:
         info = json.load(json_fp)
         assert info['version'] == 1
 
@@ -83,7 +89,7 @@ def get_lca_info(lca_info, ksize, scaled):
 
     lca_file = os.path.join(basepath, entry['lca_db'])
     print('loading k-mer DB from:', lca_file)
-    hashval_to_lca = load(open(lca_file, 'rb'))
+    hashval_to_lca = load(xopen(lca_file, 'rb'))
 
     return taxfoo, hashval_to_lca, entry['scaled']
 

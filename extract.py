@@ -15,7 +15,7 @@ Briefly,
 
 Usage::
 
-   kraken/extract.py genbank/*.csv.gz nodes.dmp ecoli_many_sigs/ecoli-*.sig --savename foobar
+   kraken/extract.py foobar.lca genbank/*.csv.gz nodes.dmp ecoli_many_sigs/ecoli-*.sig --lca-json=db.lca.json
 
 The E. coli signatures used in the command above can be downloaded like so:
 
@@ -25,26 +25,8 @@ The E. coli signatures used in the command above can be downloaded like so:
 
     curl -O -L ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
     tar xzf taxdump.tar.gz nodes.dmp names.dmp
-
-----
-
-This could be pretty easily broken down into multiple steps:
-
-* step 1: link hashes to lineages and save those links to a file;
-* step 1b: update this file as many times as you want;
-* step 2: find last-common-ancestor taxid for each hash.
-
-This would make adding in new organisms to the LCA database much
-faster, though no less memory intensive.
-
-----
-
-TODO:
-
-* refactor this into two stages?
-* add --traverse-dir argument a la sourmash
-* check on kraken/kaiju output, see what else I should be doing
 """
+
 import sys, os
 import sourmash_lib, sourmash_lib.signature
 import argparse

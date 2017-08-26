@@ -25,14 +25,11 @@ TODO:
 * add classification of FASTA/FASTQ?
 """
 
-import sourmash_lib, sourmash_lib.signature
 import argparse
-from pickle import load
 import collections
-from ncbi_taxdump_utils import NCBI_TaxonomyFoo
-import os
-import json
-import gzip
+
+import sourmash_lib, sourmash_lib.signature
+import lca_json
 
 SCALED=10000                              # should match the LCA compute @CTB
 
@@ -47,63 +44,17 @@ kraken_rank_code = {
     'kingdom': 'K',
     'domain': 'D' }
 
-def xopen(filename, mode):
-    if filename.endswith('.gz'):
-        return gzip.open(filename, mode)
-    return open(filename, mode)
-
-
-def load_lca_json(filename):
-    with xopen(filename, 'rt') as json_fp:
-        info = json.load(json_fp)
-        assert info['version'] == 1
-
-    info['basepath'] = os.path.dirname(filename)
-
-    return info
-
-
-def get_lca_info(lca_info, ksize, scaled):
-    assert lca_info['version'] == 1
-    basepath = lca_info['basepath']
-
-    matching_ksizes = []
-    for db in lca_info['dblist']:
-        if db['ksize'] == ksize:
-            matching_ksizes.append(db)
-
-    # ignore scaled matching for now, take first one
-    assert len(matching_ksizes) == 1
-    entry = matching_ksizes[0]
-
-    taxfoo = NCBI_TaxonomyFoo()
-
-    # load the nodes_dmp file to get the tax tree
-    nodes_file = os.path.join(basepath, entry['nodes'])
-    print('loading taxonomic nodes from:', nodes_file)
-    taxfoo.load_nodes_dmp(nodes_file)
-
-    names_file = os.path.join(basepath, entry['names'])
-    print('loading taxonomic names from:', names_file)
-    taxfoo.load_names_dmp(names_file)
-
-    lca_file = os.path.join(basepath, entry['lca_db'])
-    print('loading k-mer DB from:', lca_file)
-    hashval_to_lca = load(xopen(lca_file, 'rb'))
-
-    return taxfoo, hashval_to_lca, entry['scaled']
-
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('lca_json')
+    p.add_argument('lca_filename')
     p.add_argument('sigfiles', nargs='+')
     p.add_argument('-k', '--ksize', default=31, type=int)
     args = p.parse_args()
 
-    # load lca.json
-    info = load_lca_json(args.lca_json)
-    taxfoo, hashval_to_lca, scaled = get_lca_info(info, args.ksize, SCALED)
+    # load lca info
+    lca_db = lca_json.LCA_Database(args.lca_filename)
+    taxfoo, hashval_to_lca, scaled = lca_db.get_database(args.ksize, SCALED)
     
     # load signatures
     siglist = []

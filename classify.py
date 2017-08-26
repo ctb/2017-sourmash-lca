@@ -79,7 +79,8 @@ def main():
     # downsample
     print('downsampling to scaled value: {}'.format(SCALED))
     for sig in siglist:
-        sig.minhash = sig.minhash.downsample_scaled(SCALED)
+        if sig.minhash.scaled < SCALED:
+            sig.minhash = sig.minhash.downsample_scaled(SCALED)
 
     # now, extract hash values!
     hashvals = collections.defaultdict(int)

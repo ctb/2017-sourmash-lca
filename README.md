@@ -28,3 +28,22 @@ Now, run classification on any signatures you have lying around:
 classify.py ecoli/ecoli.lca.json ecoli_many_sigs/ecoli-1.sig
 ```
 
+
+## Using genbank LCA database
+
+## (constructed for k=21, 31, and 51)
+
+Download 'sourmash-lca-mark1/genbank-lca-2017.08.26.tar.gz' from [osf.io/zfmbd/][https://osf.io/zfmbd/] and unpack it --
+
+```
+curl -L https://osf.io/zfmbd/download?version=1 -o genbank-lca-2017.08.26.tar.gz
+tar xzf genbank-lca-2017.08.26.tar.gz
+```
+
+This will give you a `genbank.lca.json` file along with a `genbank/` subdirectory.
+
+Now execute:
+
+```
+classify.py -k 31 genbank.lca.json sigfile.sig
+```

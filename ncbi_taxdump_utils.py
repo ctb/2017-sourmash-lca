@@ -68,6 +68,11 @@ class NCBI_TaxonomyFoo(object):
         if not taxid_set:
             return 1
 
+        taxid_set = set(taxid_set)  #  copy
+
+        if len(taxid_set) == 1:
+            return taxid_set.pop()
+
         # get the first full path
         taxid = taxid_set.pop()
         path = []

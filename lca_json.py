@@ -56,6 +56,20 @@ class LCA_Database(object):
         assert len(matching_ksizes) == 1
         entry = matching_ksizes[0]
 
+        taxfoo = self.get_taxonomy(entry)
+        
+        lca_file = os.path.join(basepath, entry['lca_db'])
+        print('loading k-mer DB from:', lca_file)
+        with xopen(lca_file, 'rb') as hashval_fp:
+            hashval_to_lca = load(hashval_fp)
+
+        return taxfoo, hashval_to_lca, entry['scaled']
+
+    def get_taxonomy(self, entry=None):
+        if entry == None:
+            entry = self.lca['dblist'][0]
+
+        basepath = self.lca['basepath']
         taxfoo = NCBI_TaxonomyFoo()
 
         # load the nodes_dmp file to get the tax tree
@@ -67,12 +81,7 @@ class LCA_Database(object):
         print('loading taxonomic names from:', names_file)
         taxfoo.load_names_dmp(names_file)
 
-        lca_file = os.path.join(basepath, entry['lca_db'])
-        print('loading k-mer DB from:', lca_file)
-        with xopen(lca_file, 'rb') as hashval_fp:
-            hashval_to_lca = load(hashval_fp)
-
-        return taxfoo, hashval_to_lca, entry['scaled']
+        return taxfoo
 
 
 ### utility functions

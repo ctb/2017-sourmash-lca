@@ -98,7 +98,7 @@ class NCBI_TaxonomyFoo(object):
         taxid = int(taxid)
 
         lineage = []
-        while taxid != 1:
+        while 1:
             if taxid not in self.node_to_info:
                 print('cannot find taxid {}; quitting.'.format(taxid))
                 break
@@ -107,6 +107,30 @@ class NCBI_TaxonomyFoo(object):
             if not want_taxonomy or rank in want_taxonomy:
                 lineage.insert(0, name)
             taxid = self.child_to_parent[taxid]
+            if taxid == 1:
+                break
+
+        return lineage
+
+
+    def get_lineage_as_dict(self, taxid, want_taxonomy=None):
+        """
+        Extract the text taxonomic lineage in order (kingdom on down)
+        """
+        taxid = int(taxid)
+
+        lineage = {}
+        while 1:
+            if taxid not in self.node_to_info:
+                print('cannot find taxid {}; quitting.'.format(taxid))
+                break
+            rank = self.node_to_info[taxid][0]
+            name = self.taxid_to_names[taxid][0]
+            if not want_taxonomy or rank in want_taxonomy:
+                lineage[rank] = name
+            taxid = self.child_to_parent[taxid]
+            if taxid == 1:
+                break
 
         return lineage
 

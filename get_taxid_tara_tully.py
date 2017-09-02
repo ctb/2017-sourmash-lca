@@ -63,9 +63,6 @@ def main():
         last_rank = None
         last_name = None
 
-        if n > 100:
-            break
-
         genome_name, row = row[0], row[1:]
 
         for rank, name in zip(want_taxonomy, row):

@@ -62,22 +62,22 @@ class NCBI_TaxonomyFoo(object):
         taxid = int(taxid)
         return taxid
 
-    # code to find the last common ancestor from the lineage string
-    def find_lca(self, acc_set):
+    # code to find the last common ancestor from a set of taxids
+    def find_lca(self, taxid_set):
         # empty? exit.
-        if not acc_set:
+        if not taxid_set:
             return 1
 
         # get the first full path
-        taxid = acc_set.pop()
+        taxid = taxid_set.pop()
         path = []
         while taxid != 1:
             path.insert(0, taxid)
             taxid = self.child_to_parent.get(taxid, 1)   # @CTB reexamine
 
         # find the first shared taxid in each follow-on path
-        while acc_set:
-            taxid = acc_set.pop()
+        while taxid_set:
+            taxid = taxid_set.pop()
 
             path2 = []
             while taxid != 1:

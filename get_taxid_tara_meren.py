@@ -27,7 +27,7 @@ def main():
     for row in r:
         n += 1
         genome_name = row[0]
-        taxid = 1
+        taxid = 131567
 
         lineage = taxfoo.get_lineage(taxid, want_taxonomy)
         results.append((genome_name, str(taxid), ";".join(lineage)))

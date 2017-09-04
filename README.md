@@ -47,3 +47,8 @@ Now execute:
 ```
 classify.py -k 31 genbank.lca.json sigfile.sig
 ```
+
+## Taxonomy file sources
+
+tara_meren_taxids.csv from
+https://www.dropbox.com/s/xplbkhnlim5wj1j/Table_S3.xlsx?dl=0

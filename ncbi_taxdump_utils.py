@@ -6,6 +6,7 @@ import gzip
 import csv
 import os
 from pickle import dump, load
+import collections
 
 
 want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
@@ -68,11 +69,6 @@ class NCBI_TaxonomyFoo(object):
         if not taxid_set:
             return 1
 
-        taxid_set = set(taxid_set)  #  copy
-
-        if len(taxid_set) == 1:
-            return taxid_set.pop()
-
         # get the first full path
         taxid = taxid_set.pop()
         path = []
@@ -96,9 +92,44 @@ class NCBI_TaxonomyFoo(object):
             return path[-1]
         return 1
 
+    def get_taxid_name(self, taxid):
+        if taxid not in self.node_to_info:
+            return None
+
+        name = self.taxid_to_names[taxid][0]
+        return name
+
+    def get_taxid_rank(self, taxid):
+        if taxid not in self.node_to_info:
+            return None
+
+        rank = self.node_to_info[taxid][0]
+        return rank
+
+    def get_taxid_parent(self, taxid):
+        return self.child_to_parent.get(taxid, None)
+
+    def get_lineage_as_taxids(self, taxid):
+        """
+        Extract the text taxonomic lineage in order (kingdom on down).
+        """
+        taxid = int(taxid)
+        
+        lineage = []
+        while 1:
+            lineage.insert(0, taxid)
+            taxid = self.get_taxid_parent(taxid)
+            if taxid is None:
+                raise ValueError('cannot find taxid {}'.format(taxid))
+
+            if taxid == 1:
+                break
+
+        return lineage
+        
     def get_lineage(self, taxid, want_taxonomy=None):
         """
-        Extract the text taxonomic lineage in order (kingdom on down)
+        Extract the text taxonomic lineage in order (kingdom on down).
         """
         taxid = int(taxid)
 
@@ -107,11 +138,11 @@ class NCBI_TaxonomyFoo(object):
             if taxid not in self.node_to_info:
                 print('cannot find taxid {}; quitting.'.format(taxid))
                 break
-            rank = self.node_to_info[taxid][0]
-            name = self.taxid_to_names[taxid][0]
+            rank = self.get_taxid_rank(taxid)
+            name = self.get_taxid_name(taxid)
             if not want_taxonomy or rank in want_taxonomy:
                 lineage.insert(0, name)
-            taxid = self.child_to_parent[taxid]
+            taxid = self.get_taxid_parent(taxid)
             if taxid == 1:
                 break
 
@@ -120,7 +151,8 @@ class NCBI_TaxonomyFoo(object):
 
     def get_lineage_as_dict(self, taxid, want_taxonomy=None):
         """
-        Extract the text taxonomic lineage in order (kingdom on down)
+        Extract the text taxonomic lineage in order (kingdom on down);
+        return in dictionary.
         """
         taxid = int(taxid)
 
@@ -129,15 +161,64 @@ class NCBI_TaxonomyFoo(object):
             if taxid not in self.node_to_info:
                 print('cannot find taxid {}; quitting.'.format(taxid))
                 break
-            rank = self.node_to_info[taxid][0]
-            name = self.taxid_to_names[taxid][0]
+            rank = self.get_taxid_rank(taxid)
+            name = self.get_taxid_name(taxid)
             if not want_taxonomy or rank in want_taxonomy:
                 lineage[rank] = name
-            taxid = self.child_to_parent[taxid]
+            taxid = self.get_taxid_parent(taxid)
             if taxid == 1:
                 break
 
         return lineage
+
+    def get_lowest_lineage(self, taxids, want_taxonomy):
+        """\
+        Find the taxid of the lowest taxonomic rank consonant with a bunch of
+        taxids.
+        """
+
+        # across all taxids, what ranks are found?
+        ranks_found = collections.defaultdict(set)
+        for taxid in taxids:
+            lineage = self.get_lineage_as_taxids(taxid)
+
+            for l_taxid in lineage:
+                rank = self.get_taxid_rank(l_taxid)
+                ranks_found[rank].add(l_taxid)
+
+        # now, extract the lowest one:
+        last_taxid = [1]
+        for rank in reversed(want_taxonomy):
+            if ranks_found.get(rank):
+                last_taxid = ranks_found[rank]
+                        
+        assert len(last_taxid) == 1
+        taxid = min(last_taxid)       # get only element in set
+        return taxid
+
+        
+    def get_lineage_first_disagreement(self, taxids, want_taxonomy):
+        """\
+        Find the first taxonomic rank where the taxids actually disagree.
+
+        Returns (None, None) if no disagreement.
+        This will ignore situations where one taxid is the ancestor of another.
+        """
+        # across all taxids, what ranks are found?
+        ranks_found = collections.defaultdict(set)
+        for taxid in taxids:
+            lineage = self.get_lineage_as_taxids(taxid)
+
+            for l_taxid in lineage:
+                rank = self.get_taxid_rank(l_taxid)
+                ranks_found[rank].add(l_taxid)
+
+        # find first place where there are multiple names at a given rank
+        for rank in reversed(want_taxonomy):
+            if len(ranks_found.get(rank, [])) > 1:
+                return rank, ranks_found[rank]
+
+        return (None, None)
 
 
 ### internal utility functions

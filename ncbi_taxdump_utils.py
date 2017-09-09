@@ -9,6 +9,10 @@ from pickle import dump, load
 import collections
 
 
+names_mem_cache = {}
+nodes_mem_cache = {}
+
+
 want_taxonomy = ['superkingdom', 'phylum', 'order', 'class', 'family', 'genus', 'species']
 
 
@@ -20,6 +24,10 @@ class NCBI_TaxonomyFoo(object):
         self.accessions = None
 
     def load_nodes_dmp(self, filename, do_save_cache=True):
+        if filename in nodes_mem_cache:
+            self.child_to_parent, self.node_to_info = nodes_mem_cache[filename]
+            return
+
         cache_file = filename + '.cache'
         if os.path.exists(cache_file):
             with xopen(cache_file, 'rb') as cache_fp:
@@ -29,11 +37,17 @@ class NCBI_TaxonomyFoo(object):
             if do_save_cache:
                 self.save_nodes_cache(cache_file)
 
+        nodes_mem_cache[filename] = self.child_to_parent, self.node_to_info
+
     def save_nodes_cache(self, cache_file):
         with xopen(cache_file, 'wb') as cache_fp:
             dump((self.child_to_parent, self.node_to_info), cache_fp)
 
     def load_names_dmp(self, filename, do_save_cache=True):
+        if filename in names_mem_cache:
+            self.taxid_to_names = names_mem_cache[filename]
+            return
+
         cache_file = filename + '.cache'
         if os.path.exists(cache_file):
             with xopen(cache_file, 'rb') as cache_fp:
@@ -41,6 +55,8 @@ class NCBI_TaxonomyFoo(object):
         else:
             self.taxid_to_names = parse_names(filename)
             self.save_names_cache(cache_file)
+
+        names_mem_cache[filename] = self.taxid_to_names
 
     def save_names_cache(self, cache_file):
         with xopen(cache_file, 'wb') as cache_fp:
@@ -70,6 +86,7 @@ class NCBI_TaxonomyFoo(object):
             return 1
 
         # get the first full path
+        taxid_set = set(taxid_set)        # make a copy
         taxid = taxid_set.pop()
         path = []
         while taxid != 1:
@@ -188,7 +205,7 @@ class NCBI_TaxonomyFoo(object):
 
         # now, extract the lowest one:
         last_taxid = [1]
-        for rank in reversed(want_taxonomy):
+        for rank in want_taxonomy:
             if ranks_found.get(rank):
                 last_taxid = ranks_found[rank]
                         
@@ -207,16 +224,22 @@ class NCBI_TaxonomyFoo(object):
         # across all taxids, what ranks are found?
         ranks_found = collections.defaultdict(set)
         for taxid in taxids:
-            lineage = self.get_lineage_as_taxids(taxid)
+            try:
+                lineage = self.get_lineage_as_taxids(taxid)
+            except ValueError:
+                print('ERROR in lineage for taxid', taxid)
+                raise
 
             for l_taxid in lineage:
                 rank = self.get_taxid_rank(l_taxid)
                 ranks_found[rank].add(l_taxid)
 
         # find first place where there are multiple names at a given rank
-        for rank in reversed(want_taxonomy):
+        last_rank = want_taxonomy[0]
+        for rank in want_taxonomy:
             if len(ranks_found.get(rank, [])) > 1:
-                return rank, ranks_found[rank]
+                return last_rank, ranks_found[rank]
+            last_rank = rank
 
         return (None, None)
 

@@ -238,10 +238,10 @@ class NCBI_TaxonomyFoo(object):
         last_rank = want_taxonomy[0]
         for rank in want_taxonomy:
             if len(ranks_found.get(rank, [])) > 1:
-                return last_rank, ranks_found[rank]
+                return (last_rank, list(ranks_found[last_rank])[0], ranks_found[rank])
             last_rank = rank
 
-        return (None, None)
+        return (None, None, None)
 
 
 ### internal utility functions

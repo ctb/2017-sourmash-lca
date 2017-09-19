@@ -57,6 +57,7 @@ def main():
 
     p.add_argument('--traverse-directory', action='store_true')
 
+    p.add_argument('-s', '--save-hashvals', action='store_true')
     p.add_argument('-l', '--load-hashvals', action='store_true')
 
     p.add_argument('--lca-json')
@@ -122,8 +123,9 @@ def main():
             print('failed to load {} of {} files found'.format(bad_input,
                                                                len(inp_files)))
 
-        with open(args.lca_output + '.hashvals', 'wb') as hashval_fp:
-            dump(hashval_to_taxids, hashval_fp)
+        if args.save_hashvals:
+            with open(args.lca_output + '.hashvals', 'wb') as hashval_fp:
+                dump(hashval_to_taxids, hashval_fp)
 
     ####
 

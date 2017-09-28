@@ -1,4 +1,7 @@
 #! /usr/bin/env python
+"""
+Convert `sourmash gather`'s CSV output into a lineage file.
+"""
 import argparse
 import csv
 import ncbi_taxdump_utils

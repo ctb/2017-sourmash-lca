@@ -97,7 +97,7 @@ def main():
 
             try:
                 sig = sourmash_lib.signature.load_one_signature(filename,
-                                                          select_ksize=args.ksize)
+                                                          ksize=args.ksize)
             except (FileNotFoundError, ValueError):
                 if not args.traverse_directory:
                     raise

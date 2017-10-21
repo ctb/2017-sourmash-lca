@@ -24,7 +24,7 @@ TODO:
 import argparse
 import collections
 
-import sourmash_lib, sourmash_lib.signature
+import sourmash_lib
 import lca_json
 
 SCALED=10000                              # should match the LCA compute @CTB
@@ -46,6 +46,8 @@ def main():
     p.add_argument('lca_filename')
     p.add_argument('sigfiles', nargs='+')
     p.add_argument('-k', '--ksize', default=31, type=int)
+    p.add_argument('--output-unassigned', type=argparse.FileType('wt'),
+                        help='output unassigned portions of the query as a signature to this file')
     args = p.parse_args()
 
     # load lca info
@@ -56,8 +58,7 @@ def main():
     siglist = []
     print('loading signatures from {} signature files'.format(len(args.sigfiles)))
     for sigfile in args.sigfiles:
-        sigs = sourmash_lib.signature.load_signatures(sigfile,
-                                                      select_ksize=args.ksize)
+        sigs = sourmash_lib.load_signatures(sigfile, select_ksize=args.ksize)
         sigs = list(sigs)
         siglist.extend(sigs)
 
@@ -79,6 +80,8 @@ def main():
     total = 0
     by_taxid = collections.defaultdict(int)
 
+    unassigned_hashvals = set()
+
     # for every hash, get LCA of labels
     for hashval, count in hashvals.items():
         lca = hashval_to_lca.get(hashval)
@@ -86,6 +89,7 @@ def main():
 
         if lca is None:
             by_taxid[0] += count
+            unassigned_hashvals.add(hashval)
             continue
 
         by_taxid[lca] += count
@@ -117,6 +121,9 @@ def main():
     print('{}\t{}\t{}\t{}\t{}\t{}'.format('percent', 'below', 'at node',
                                           'code', 'taxid', 'name'))
     for _, taxid, count_below in x:
+        if taxid == 0:
+            continue
+
         percent = round(100 * count_below / total_count, 2)
         count_at = by_taxid[taxid]
 
@@ -146,6 +153,16 @@ def main():
 
         print('{}\t{}\t{}\t{}\t{}\t{}'.format(percent, count_below, count_at,
                                               classify_code, taxid, name))
+
+        if args.output_unassigned:
+            outname = args.output_unassigned.name
+            print('saving unassigned hashes to "{}"'.format(outname))
+
+            e = sourmash_lib.MinHash(ksize=args.ksize, n=0, scaled=scaled)
+            e.add_many(unassigned_hashvals)
+            sourmash_lib.save_signatures([ sourmash_lib.SourmashSignature('', e) ],
+                                         args.output_unassigned)
+
 
 
 if __name__ == '__main__':

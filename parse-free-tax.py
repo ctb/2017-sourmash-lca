@@ -116,10 +116,17 @@ def main():
 
     print('examining spreadsheet headers...', file=sys.stderr)
     first_row = next(iter(r))
+
+    n_disagree = 0
     for (column, value) in zip(row_headers, first_row):
         if column.lower() != value.lower():
             print('** assuming {} == {} in spreadsheet'.format(column, value),
                   file=sys.stderr)
+            n_disagree += 1
+            if n_disagree > 2:
+                print('whoa, too many assumptions. are the headers right?',
+                      file=sys.stderr)
+                sys.exit(-1)
 
     confusing_lineages = defaultdict(list)
     incompatible_lineages = defaultdict(list)
@@ -146,10 +153,13 @@ def main():
             lowest_lineage = taxfoo.get_lineage(lowest_taxid, taxlist)
             lowest_str = ', '.join(lowest_lineage)
 
+            # find last matching, in case different classification levels.
             match_lineage = [ b for (a, b) in lineage ]
-            match_lineage = match_lineage[:len(lowest_lineage)]
+            end = match_lineage.index(lowest_lineage[-1])
+            assert end >= 0
+            match_lineage = match_lineage[:end + 1]
             match_str = ', '.join(match_lineage)
-            
+
             confusing_lineages[(match_str, lowest_str)].append(ident)
             continue
 

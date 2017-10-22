@@ -41,6 +41,8 @@ def get_taxids_for_name(taxfoo, names_to_taxids, srank, sname):
     if len(taxid_at_rank) == 1:
         return taxid_at_rank[0]
 
+    # @CTB need to do something more here.
+
     return -1
 
 

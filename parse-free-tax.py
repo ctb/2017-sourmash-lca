@@ -134,9 +134,12 @@ def main():
         taxid, rest = get_lca_taxid_for_lineage(taxfoo, names_to_taxids,
                                                 lineage)
 
-        lowest_taxid, lowest_rest = get_lowest_taxid_for_lineage(taxfoo, names_to_taxids,
-                                                    lineage)
+        # and find the *lowest* identifiable ancestor taxid, just to see
+        # if there are confusing lineages.
+        lowest_taxid, lowest_rest = \
+          get_lowest_taxid_for_lineage(taxfoo, names_to_taxids, lineage)
 
+        # do they match? if not, report.
         if lowest_taxid != taxid:
             lowest_lineage = taxfoo.get_lineage(lowest_taxid, taxlist)
             lowest_str = ', '.join(lowest_lineage)
@@ -146,6 +149,7 @@ def main():
             match_str = ', '.join(match_lineage)
             
             confusing_lineages[(match_str, lowest_str)].append(ident)
+            continue
 
         # check! NCBI lineage should be lineage of taxid + rest
         ncbi_lineage = taxfoo.get_lineage(taxid, taxlist)

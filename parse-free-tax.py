@@ -15,6 +15,7 @@ class TaxidNotFound(Exception):
 
 taxlist = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus',
            'species']
+null_names = set(['[Blank]', 'na', 'null'])
 
 
 def get_taxids_for_name(taxfoo, names_to_taxids, srank, sname):
@@ -49,7 +50,7 @@ def get_lca_taxid_for_lineage(taxfoo, names_to_taxids, lineage):
     the lineage pairs.
     """
     lineage = list(lineage)               # make a copy
-    while 1:
+    while lineage:
         (rank, name) = lineage.pop(0)
         try:
             taxid = get_taxids_for_name(taxfoo, names_to_taxids, rank, name)
@@ -57,11 +58,8 @@ def get_lca_taxid_for_lineage(taxfoo, names_to_taxids, lineage):
                 raise TaxidNotFound
             last_taxid = taxid
 
-            if taxfoo.get_taxid_rank(taxid) != rank:
-                print('watrank?', taxfoo.get_taxid_rank(taxid), rank)
-            if taxfoo.get_taxid_name(taxid) != name:
-                print('watname?', taxfoo.get_taxid_name(taxid), name)
-            
+            assert taxfoo.get_taxid_rank(taxid) == rank
+            assert taxfoo.get_taxid_name(taxid) == name
         except TaxidNotFound:
             lineage.insert(0, (rank, name))   # add back in!
             break
@@ -85,9 +83,9 @@ def get_lowest_taxid_for_lineage(taxfoo, names_to_taxids, lineage):
                 raise TaxidNotFound
         except TaxidNotFound:
             remainder.append((rank, ident))
-            continue
+            continue                      # super borked logic
 
-        break
+        break                             # super borked logic
 
     return taxid, list(reversed(remainder))
 
@@ -130,6 +128,9 @@ def main():
         ident = lineage[0][1]
         lineage = lineage[1:]
 
+        # clean lineage of null names
+        lineage = [(a,b) for (a,b) in lineage if b not in null_names]
+
         # ok, find the least-common-ancestor taxid...
         taxid, rest = get_lca_taxid_for_lineage(taxfoo, names_to_taxids,
                                                 lineage)
@@ -153,17 +154,37 @@ def main():
 
         # check! NCBI lineage should be lineage of taxid + rest
         ncbi_lineage = taxfoo.get_lineage(taxid, taxlist)
+        assert len(ncbi_lineage)
         reconstructed = ncbi_lineage + [ b for (a,b) in rest ]
 
         # ...make a comparable lineage from the CSV line...
         csv_lineage = [ b for (a, b) in lineage ]
 
-        # are they the same??
+        # are NCBI-rooted and CSV lineages the same?? if not, report.
         if csv_lineage != reconstructed:
             csv_str = ", ".join(csv_lineage[:len(ncbi_lineage)])
             ncbi_str = ", ".join(ncbi_lineage)
             incompatible_lineages[(csv_str, ncbi_str)].append(ident)
+            continue
 
+        # all is well if we've reached this point! We've got NCBI-rooted
+        # taxonomies and now we need to record. next:
+        #
+        # build a set of triples: (rank, name, taxid), where taxid can
+        # be None.
+
+        lineage_taxids = taxfoo.get_lineage_as_taxids(taxid)
+        triples_info = []
+        for taxid in lineage_taxids:
+            name = taxfoo.get_taxid_name(taxid)
+            rank = taxfoo.get_taxid_rank(taxid)
+
+            if rank in taxlist:
+                triples_info.append((rank, name, taxid))
+
+        for (rank, name) in rest:
+            assert rank in taxlist
+            triples_info.append((rank, name, None))
 
     print('## {} confusing lineages --'.format(len(confusing_lineages)))
 
@@ -186,6 +207,8 @@ def main():
         print('\tNCBI:', ncbi_str)
         print('({} rows in spreadsheet)'.format(len(ident_list)))
         print('---')
+
+    ## next phase: collapse lineages etc.
 
 
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ import csv
 import traceback
 import ncbi_taxdump_utils
 from collections import defaultdict
+import pprint
 
 class TaxidNotFound(Exception):
     pass
@@ -185,6 +186,8 @@ def main():
         for (rank, name) in rest:
             assert rank in taxlist
             triples_info.append((rank, name, None))
+
+        #pprint.pprint(triples_info)
 
     print('## {} confusing lineages --'.format(len(confusing_lineages)))
 

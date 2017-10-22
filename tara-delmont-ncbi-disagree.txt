@@ -1,0 +1,128 @@
+## 16 confusing lineages --
+confusing lineage #1
+	CSV:  Eukaryota, Heterokonta, Pelagophyceae, Pelagomonadales
+	NCBI: Eukaryota, Pelagophyceae, Pelagomonadales, Aureococcus
+(4 rows in spreadsheet)
+---
+confusing lineage #2
+	CSV:  Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales_3, Alteromonadaceae
+	NCBI: Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales, Alteromonadaceae
+(9 rows in spreadsheet)
+---
+confusing lineage #3
+	CSV:  Eukaryota, Chlorophyta, Prasinophyceae, Mamiellales, Mamiellaceae, Micromonas
+	NCBI: Eukaryota, Chlorophyta, Mamiellophyceae, Mamiellales, Mamiellaceae, Micromonas
+(14 rows in spreadsheet)
+---
+confusing lineage #4
+	CSV:  Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales_2, Pseudoalteromonadaceae, Pseudoalteromonas
+	NCBI: Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales, Pseudoalteromonadaceae, Pseudoalteromonas
+(5 rows in spreadsheet)
+---
+confusing lineage #5
+	CSV:  Eukaryota, Haptophyta, Prymnesiophyceae, Phaeocystales
+	NCBI: Eukaryota, Phaeocystales, Phaeocystaceae, Phaeocystis
+(1 rows in spreadsheet)
+---
+confusing lineage #6
+	CSV:  Eukaryota, Haptophyta, Prymnesiophyceae, Isochrysidales
+	NCBI: Eukaryota, Isochrysidales, Noelaerhabdaceae, Emiliania
+(14 rows in spreadsheet)
+---
+confusing lineage #7
+	CSV:  Bacteria, Cyanobacteria, Chroococcales
+	NCBI: Bacteria, Cyanobacteria, Chroococcales
+(3 rows in spreadsheet)
+---
+confusing lineage #8
+	CSV:  Eukaryota, Cryptophyta, Cryptophyceae, Pyrenomonadales, Geminigeraceae
+	NCBI: Eukaryota, Cryptophyta, Pyrenomonadales, Geminigeraceae, Guillardia
+(1 rows in spreadsheet)
+---
+confusing lineage #9
+	CSV:  Bacteria, Proteobacteria, Gammaproteobacteria, Oceanospirillales, Alteromonadaceae_2, Marinobacter
+	NCBI: Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales, Alteromonadaceae, Marinobacter
+(5 rows in spreadsheet)
+---
+confusing lineage #10
+	CSV:  Eukaryota, Chlorophyta, Prasinophyceae, Mamiellales, Mamiellaceae, Bathycoccus
+	NCBI: Eukaryota, Chlorophyta, Mamiellophyceae, Mamiellales, Bathycoccaceae, Bathycoccus
+(8 rows in spreadsheet)
+---
+confusing lineage #11
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Sphingomonadales, Sphingomonadaceae_3, Sphingobium
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Sphingomonadales, Sphingomonadaceae, Sphingobium
+(1 rows in spreadsheet)
+---
+confusing lineage #12
+	CSV:  Bacteria, Proteobacteria, Gammaproteobacteria, Alteromonadales_3, Alteromonadaceae, Haliea
+	NCBI: Bacteria, Proteobacteria, Gammaproteobacteria, Cellvibrionales, Halieaceae, Haliea
+(2 rows in spreadsheet)
+---
+confusing lineage #13
+	CSV:  Eukaryota, Chlorophyta, Prasinophyceae, Mamiellales, Bathycoccaceae, Ostreococcus
+	NCBI: Eukaryota, Chlorophyta, Mamiellophyceae, Mamiellales, Bathycoccaceae, Ostreococcus
+(7 rows in spreadsheet)
+---
+confusing lineage #14
+	CSV:  Bacteria, Cyanobacteria, Prochlorales, Prochlorales, Prochlorococcaceae
+	NCBI: Bacteria, Cyanobacteria, Synechococcales, Prochloraceae, Prochlorococcus
+(1 rows in spreadsheet)
+---
+confusing lineage #15
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Rhodobacterales_2, Hyphomonadaceae
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Rhodobacterales, Hyphomonadaceae
+(5 rows in spreadsheet)
+---
+confusing lineage #16
+	CSV:  Bacteria, Cyanobacteria, Chroococcales, Chroococcales, Cyanothece
+	NCBI: Bacteria, Cyanobacteria, Oscillatoriales, Cyanothecaceae, Cyanothece
+(1 rows in spreadsheet)
+---
+
+## 16 incompatible lineages --
+incompatible lineage #1
+	CSV:  Bacteria, Actinobacteria, Actinobacteria, Actinomycetales, Microbacteriaceae, Microbacterium
+	NCBI: Bacteria, Actinobacteria, Actinobacteria, Micrococcales, Microbacteriaceae, Microbacterium
+(3 rows in spreadsheet)
+---
+incompatible lineage #2
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Sphingomonadales, Erythrobacteraceae, Citromicrobium
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Sphingomonadales, Sphingomonadaceae, Citromicrobium
+(1 rows in spreadsheet)
+---
+incompatible lineage #3
+	CSV:  Bacteria, Actinobacteria, Actinobacteria, Actinomycetales, Mycobacteriaceae, Mycobacterium
+	NCBI: Bacteria, Actinobacteria, Actinobacteria, Corynebacteriales, Mycobacteriaceae, Mycobacterium
+(1 rows in spreadsheet)
+---
+incompatible lineage #4
+	CSV:  Bacteria, Spirochaetes, Spirochaetia, Spirochaetales
+	NCBI: Bacteria, Spirochaetes, Spirochaetia, Leptospiraceae
+(3 rows in spreadsheet)
+---
+incompatible lineage #5
+	CSV:  Bacteria, Bacteroidetes, Sphingobacteriia, Sphingobacteriales, Saprospiraceae
+	NCBI: Bacteria, Bacteroidetes, Saprospiria, Saprospirales, Saprospiraceae
+(3 rows in spreadsheet)
+---
+incompatible lineage #6
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Rhizobiales, Rhodobacteraceae, Labrenzia
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Rhodobacterales, Rhodobacteraceae, Labrenzia
+(1 rows in spreadsheet)
+---
+incompatible lineage #7
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Rickettsiales, Pelagibacteraceae
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Pelagibacterales, Pelagibacteraceae
+(12 rows in spreadsheet)
+---
+incompatible lineage #8
+	CSV:  Bacteria, Proteobacteria, Alphaproteobacteria, Rhizobiales, Rhodobacteraceae
+	NCBI: Bacteria, Proteobacteria, Alphaproteobacteria, Rhodobacterales, Rhodobacteraceae
+(3 rows in spreadsheet)
+---
+incompatible lineage #9
+	CSV:  Bacteria, Actinobacteria, Actinobacteria, Actinomycetales, Microbacteriaceae
+	NCBI: Bacteria, Actinobacteria, Actinobacteria, Micrococcales, Microbacteriaceae
+(2 rows in spreadsheet)
+---

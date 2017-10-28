@@ -9,6 +9,10 @@ import traceback
 import ncbi_taxdump_utils
 from collections import defaultdict
 import pprint
+import sourmash_lib
+
+sys.path.insert(0, '../2017-sourmash-revindex')
+import revindex_utils
 
 class TaxidNotFound(Exception):
     pass
@@ -98,6 +102,8 @@ def main():
     p.add_argument('names_dmp')
     p.add_argument('nodes_dmp')
     p.add_argument('csv')
+    p.add_argument('revindex')
+    p.add_argument('siglist', nargs='+')
     #p.add_argument('-v', '--verbose', action='store_true')
     args = p.parse_args()
 
@@ -132,6 +138,7 @@ def main():
 
     confusing_lineages = defaultdict(list)
     incompatible_lineages = defaultdict(list)
+    assignments = {}
     for row in r:
         lineage = list(zip(row_headers, row))
 
@@ -199,31 +206,56 @@ def main():
             assert rank in taxlist
             triples_info.append((rank, name, None))
 
+        assignments[ident] = triples_info
+
         #pprint.pprint(triples_info)
 
-    print('## {} confusing lineages --'.format(len(confusing_lineages)))
-
-    n = 0
-    for (csv_str, ncbi_str), ident_list in confusing_lineages.items():
-        n += 1
-        print('confusing lineage #{}'.format(n))
-        print('\tCSV: ', csv_str)
-        print('\tNCBI:', ncbi_str)
-        print('({} rows in spreadsheet)'.format(len(ident_list)))
-        print('---')
-
-    print('\n## {} incompatible lineages --'.format(len(incompatible_lineages)))
-
-    n = 0
-    for (csv_str, ncbi_str), ident_list in incompatible_lineages.items():
-        n += 1
-        print('incompatible lineage #{}'.format(n))
-        print('\tCSV: ', csv_str)
-        print('\tNCBI:', ncbi_str)
-        print('({} rows in spreadsheet)'.format(len(ident_list)))
-        print('---')
+    print('{} weird lineages; ignoring for now.'.format(len(confusing_lineages) + len(incompatible_lineages)))
 
     ## next phase: collapse lineages etc.
+
+    ## load revindex
+
+    print('loading reverse index:', args.revindex)
+    custom_bins_ri = revindex_utils.HashvalRevindex(args.revindex)
+
+    print('loading signatures for custom genomes...')
+    custom_sigs = {}
+    sigids_to_sig = {}
+    for sigid, (filename, md5) in custom_bins_ri.sigid_to_siginfo.items():
+        sig = revindex_utils.get_sourmash_signature(filename, md5)
+        if sig.name() in assignments:
+            custom_sigs[md5] = sig
+            sigids_to_sig[sigid] = sig
+
+    # figure out what ksize we're talking about here! this should
+    # probably be stored on the revindex...
+    random_db_sig = next(iter(sigids_to_sig.values()))
+    ksize = random_db_sig.minhash.ksize
+
+    print('...found {} signatures that also have assignments!!'.format(len(custom_sigs)))
+
+    ## now, connect the dots: hashvals to custom classifications
+    hashval_to_custom = {}
+    for hashval, sigids in custom_bins_ri.hashval_to_sigids.items():
+        for sigid in sigids:
+            sig = sigids_to_sig.get(sigid, None)
+            if sig:
+                assignment = assignments[sig.name()]
+                hashval_to_custom[hashval] = assignment
+
+    # whew! done!! we can now go from a hashval to a custom assignment!!
+    for query_filename in args.siglist:
+        for query_sig in sourmash_lib.load_signatures(query_filename,
+                                                      ksize=ksize):
+            print('Query!', query_sig.name())
+            names = set()
+            for hashval in query_sig.minhash.get_mins():
+                assignment = hashval_to_custom.get(hashval)
+                if assignment:
+                    lineage_str = "; ".join([ b for (a,b,c) in assignment ])
+                    names.add(lineage_str)
+            print("\t{}".format("\n\t".join(names)))
 
 
 if __name__ == '__main__':

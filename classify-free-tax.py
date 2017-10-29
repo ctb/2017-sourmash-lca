@@ -8,6 +8,7 @@ import csv
 import traceback
 import ncbi_taxdump_utils
 from collections import defaultdict, Counter
+import itertools
 import pprint
 import sourmash_lib
 import lca_json                      # from github.com/ctb/2017-sourmash-lca
@@ -26,6 +27,12 @@ class TaxidNotFound(Exception):
 taxlist = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus',
            'species']
 null_names = set(['[Blank]', 'na', 'null'])
+
+
+_print_debug = False
+def debug(*args):
+    if _print_debug:
+        print(*args)
 
 
 def get_taxids_for_name(taxfoo, names_to_taxids, srank, sname):
@@ -242,13 +249,21 @@ def main():
     p.add_argument('siglist', nargs='+')
     p.add_argument('--lca', nargs='+', default=LCA_DBs)
     p.add_argument('-k', '--ksize', default=31, type=int)
+    p.add_argument('-o', '--output', type=argparse.FileType('wt'),
+                   help='output CSV to this file instead of stdout')
     #p.add_argument('-v', '--verbose', action='store_true')
+    p.add_argument('-d', '--debug', action='store_true')
     args = p.parse_args()
+
+    if args.debug:
+        global _print_debug
+        _print_debug = True
 
     ## load LCA databases
     lca_db_list = []
     for lca_filename in args.lca:
-        print('loading LCA database from {}'.format(lca_filename))
+        print('loading LCA database from {}'.format(lca_filename),
+              file=sys.stderr)
         lca_db = lca_json.LCA_Database(lca_filename)
         taxfoo, hashval_to_lca, _ = lca_db.get_database(args.ksize, SCALED)
         lca_db_list.append((taxfoo, hashval_to_lca))
@@ -310,7 +325,6 @@ def main():
             match_str = ', '.join(match_lineage)
 
             confusing_lineages[(match_str, lowest_str)].append(ident)
-            continue
 
         # check! NCBI lineage should be lineage of taxid + rest
         ncbi_lineage = taxfoo.get_lineage(taxid, taxlist)
@@ -325,7 +339,6 @@ def main():
             csv_str = ", ".join(csv_lineage[:len(ncbi_lineage)])
             ncbi_str = ", ".join(ncbi_lineage)
             incompatible_lineages[(csv_str, ncbi_str)].append(ident)
-            continue
 
         # all is well if we've reached this point! We've got NCBI-rooted
         # taxonomies and now we need to record. next:
@@ -348,30 +361,30 @@ def main():
 
         assignments[ident] = tuples_info
 
-        #pprint.pprint(triples_info)
-
-    print('{} weird lineages; ignoring for now.'.format(len(confusing_lineages) + len(incompatible_lineages)))
+    print("{} weird lineages that maybe don't match with NCBI.".format(len(confusing_lineages) + len(incompatible_lineages)), file=sys.stderr)
 
     ## next phase: collapse lineages etc.
 
     ## load revindex
-    print('loading reverse index:', args.revindex)
+    print('loading reverse index:', args.revindex, file=sys.stderr)
     custom_bins_ri = revindex_utils.HashvalRevindex(args.revindex)
 
     # load the signatures associated with each revindex.
-    print('loading signatures for custom genomes...')
+    print('loading signatures for custom genomes...', file=sys.stderr)
     sigids_to_sig = {}
     for sigid, (filename, md5) in custom_bins_ri.sigid_to_siginfo.items():
         sig = revindex_utils.get_sourmash_signature(filename, md5)
         if sig.name() in assignments:
             sigids_to_sig[sigid] = sig
+        else:
+            debug('no assignment:', sig.name())
 
     # figure out what ksize we're talking about here! (this should
     # probably be stored on the revindex...)
     random_db_sig = next(iter(sigids_to_sig.values()))
     ksize = random_db_sig.minhash.ksize
 
-    print('...found {} signatures that also have assignments!!'.format(len(sigids_to_sig)))
+    print('...found {} custom genomes that also have assignments!!'.format(len(sigids_to_sig)), file=sys.stderr)
 
     ## now, connect the dots: hashvals to custom classifications
     hashval_to_custom = defaultdict(list)
@@ -386,16 +399,30 @@ def main():
 
     # for each query, gather all the matches in both custom and NCBI, then
     # classify.
+    csvfp = csv.writer(sys.stdout)
+    if args.output:
+        print("outputting classifications to '{}'".format(args.output.name))
+        csvfp = csv.writer(args.output)
+    else:
+        print("outputting classifications to stdout")
+    csvfp.writerow(['ID'] + taxlist)
+
+    total_count = 0
     for query_filename in args.siglist:
         for query_sig in sourmash_lib.load_signatures(query_filename,
                                                       ksize=ksize):
-            print(query_sig.name())
+            print(u'\r\033[K', end=u'', file=sys.stderr)
+            print('... classifying {}'.format(query_sig.name()), end='\r',
+                  file=sys.stderr)
+            total_count += 1
             these_assignments = defaultdict(list)
+            n_custom = 0
             for hashval in query_sig.minhash.get_mins():
                 # custom
                 assignment = hashval_to_custom.get(hashval, [])
                 if assignment:
                     these_assignments[hashval].extend(assignment)
+                    n_custom += 1
 
                 # NCBI
                 for (this_taxfoo, hashval_to_lca) in lca_db_list:
@@ -410,6 +437,14 @@ def main():
                                 break
                             tuple_info.append((rank, lineage[rank]))
                         these_assignments[hashval_lca].append(tuple_info)
+
+            check_counts = Counter()
+            for tuple_info in these_assignments.values():
+                last_tup = tuple(tuple_info[-1])
+                check_counts[last_tup] += 1
+
+            debug('n custom hashvals:', n_custom)
+            debug(pprint.pformat(check_counts.most_common()))
 
             # now convert to trees -> do LCA & counts
             counts = Counter()
@@ -437,6 +472,8 @@ def main():
             tree = {}
             tree_counts = defaultdict(int)
 
+            debug(pprint.pformat(counts.most_common()))
+
             n = 0
             for lca, count in counts.most_common():
                 if count < THRESHOLD:
@@ -450,20 +487,39 @@ def main():
                     xx.insert(0, parent)
                     tree_counts[parent] += count
                     parent = parents.get(parent)
-                print(n, count, xx[1:])
+                debug(n, count, xx[1:])
 
                 # update tree with this set of assignments
                 build_tree([xx], tree)
 
             if n > 1:
-                print('XXX', n)
+                debug('XXX', n)
 
             # now find LCA? or whatever.
             lca, reason = find_lca(tree)
             if reason == 0:               # leaf node
-                print('END', lca)
+                debug('END', lca)
             else:                         # internal node
-                print('MULTI', lca)
+                debug('MULTI', lca)
+
+            # backtrack to full lineage via parents
+            lineage = []
+            parent = lca
+            while parent != ('root', 'root'):
+                lineage.insert(0, parent)
+                parent = parents.get(parent)
+
+            # output!
+            row = [query_sig.name()]
+            for taxrank, (rank, name) in itertools.zip_longest(taxlist, lineage, fillvalue=('', '')):
+                if rank:
+                    assert taxrank == rank
+                row.append(name)
+
+            csvfp.writerow(row)
+
+    print(u'\r\033[K', end=u'', file=sys.stderr)
+    print('classified {} signatures total'.format(total_count), file=sys.stderr)
 
 
 if __name__ == '__main__':

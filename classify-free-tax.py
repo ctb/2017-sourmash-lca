@@ -414,7 +414,9 @@ def main():
             print(u'\r\033[K', end=u'', file=sys.stderr)
             print('... classifying {}'.format(query_sig.name()), end='\r',
                   file=sys.stderr)
+            debug('classifying', query_sig.name())
             total_count += 1
+
             these_assignments = defaultdict(list)
             n_custom = 0
             for hashval in query_sig.minhash.get_mins():

@@ -360,12 +360,10 @@ def main():
 
     # load the signatures associated with each revindex.
     print('loading signatures for custom genomes...')
-    custom_sigs = {}
     sigids_to_sig = {}
     for sigid, (filename, md5) in custom_bins_ri.sigid_to_siginfo.items():
         sig = revindex_utils.get_sourmash_signature(filename, md5)
         if sig.name() in assignments:
-            custom_sigs[md5] = sig
             sigids_to_sig[sigid] = sig
 
     # figure out what ksize we're talking about here! (this should
@@ -373,7 +371,7 @@ def main():
     random_db_sig = next(iter(sigids_to_sig.values()))
     ksize = random_db_sig.minhash.ksize
 
-    print('...found {} signatures that also have assignments!!'.format(len(custom_sigs)))
+    print('...found {} signatures that also have assignments!!'.format(len(sigids_to_sig)))
 
     ## now, connect the dots: hashvals to custom classifications
     hashval_to_custom = defaultdict(list)
@@ -386,7 +384,8 @@ def main():
 
     # whew! done!! we can now go from a hashval to a custom assignment!!
 
-    # for each query, gather all the matches in both custom and NCBI
+    # for each query, gather all the matches in both custom and NCBI, then
+    # classify.
     for query_filename in args.siglist:
         for query_sig in sourmash_lib.load_signatures(query_filename,
                                                       ksize=ksize):

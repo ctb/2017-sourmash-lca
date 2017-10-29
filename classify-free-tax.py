@@ -7,7 +7,7 @@ import argparse
 import csv
 import traceback
 import ncbi_taxdump_utils
-from collections import defaultdict
+from collections import defaultdict, Counter
 import pprint
 import sourmash_lib
 import lca_json                      # from github.com/ctb/2017-sourmash-lca
@@ -243,26 +243,85 @@ def main():
     print('...found {} signatures that also have assignments!!'.format(len(custom_sigs)))
 
     ## now, connect the dots: hashvals to custom classifications
-    hashval_to_custom = {}
+    hashval_to_custom = defaultdict(list)
     for hashval, sigids in custom_bins_ri.hashval_to_sigids.items():
         for sigid in sigids:
             sig = sigids_to_sig.get(sigid, None)
             if sig:
                 assignment = assignments[sig.name()]
-                hashval_to_custom[hashval] = assignment
+                hashval_to_custom[hashval].append(assignment)
 
     # whew! done!! we can now go from a hashval to a custom assignment!!
+
+    # for each query, gather all the matches in both custom and NCBI
     for query_filename in args.siglist:
         for query_sig in sourmash_lib.load_signatures(query_filename,
                                                       ksize=ksize):
-            print('Query!', query_sig.name())
-            names = set()
+            print(query_sig.name())
+            these_assignments = defaultdict(list)
             for hashval in query_sig.minhash.get_mins():
-                assignment = hashval_to_custom.get(hashval)
+                # custom
+                assignment = hashval_to_custom.get(hashval, [])
                 if assignment:
-                    lineage_str = "; ".join([ b for (a,b,c) in assignment ])
-                    names.add(lineage_str)
-            print("\t{}".format("\n\t".join(names)))
+                    these_assignments[hashval].extend(assignment)
+
+                # NCBI
+                for (this_taxfoo, hashval_to_lca) in lca_db_list:
+                    hashval_lca = hashval_to_lca.get(hashval)
+                    if hashval_lca is not None and hashval_lca != 1:
+                        lineage = this_taxfoo.get_lineage_as_dict(hashval_lca,
+                                                                  taxlist)
+
+                        triple = []
+                        for rank in taxlist:
+                            if rank not in lineage:
+                                break
+                            triple.append((rank, lineage[rank], None))
+                        these_assignments[hashval_lca].append(triple)
+
+            # now convert to trees -> do LCA & counts
+            counts = Counter()
+            parents = {}
+            for hashval in these_assignments:
+                tree = {}
+
+                for assignment in these_assignments[hashval]:
+                    node = tree
+                    last_node = ('root', 'root')
+                    for rank, name, _ in assignment:
+                        x = node.get((rank,name), {})
+                        node[(rank, name)] = x
+                        node = x
+
+                        parents[(rank, name)] = last_node
+                        last_node = (rank, name)
+
+                node = tree
+                k = ('root', 'root')
+                while 1:
+                    if len(node) == 1:
+                        k = next(iter(node.keys()))
+                        node = node[k]
+                    elif len(node) == 0:
+                        #print('END', k)
+                        break
+                    elif len(node) > 1:
+                        #print('MULTI', k)
+                        break
+
+                lca = k
+                counts[lca] += 1
+
+            for lca, count in counts.most_common():
+                if count < THRESHOLD:
+                    break
+
+                xx = []
+                parent = lca
+                while parent:
+                    xx.insert(0, parent)
+                    parent = parents.get(parent)
+                print(count, xx)
 
 
 if __name__ == '__main__':

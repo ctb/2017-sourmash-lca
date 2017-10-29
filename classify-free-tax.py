@@ -10,6 +10,11 @@ import ncbi_taxdump_utils
 from collections import defaultdict
 import pprint
 import sourmash_lib
+import lca_json                      # from github.com/ctb/2017-sourmash-lca
+
+LCA_DBs = ['db/genbank.lca.json']
+SCALED=10000
+THRESHOLD=5                               # how many counts of a taxid at min
 
 sys.path.insert(0, '../2017-sourmash-revindex')
 import revindex_utils
@@ -99,20 +104,22 @@ def get_lowest_taxid_for_lineage(taxfoo, names_to_taxids, lineage):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('names_dmp')
-    p.add_argument('nodes_dmp')
     p.add_argument('csv')
     p.add_argument('revindex')
     p.add_argument('siglist', nargs='+')
+    p.add_argument('--lca', nargs='+', default=LCA_DBs)
+    p.add_argument('-k', '--ksize', default=31, type=int)
     #p.add_argument('-v', '--verbose', action='store_true')
     args = p.parse_args()
 
-    # ok, read in all the tax info.
-    print('loading NCBI tax names/nodes', file=sys.stderr)
-    taxfoo = ncbi_taxdump_utils.NCBI_TaxonomyFoo()
-    taxfoo.load_names_dmp(args.names_dmp, False)
-    taxfoo.load_nodes_dmp(args.nodes_dmp, False)
-
+    ## load LCA databases
+    lca_db_list = []
+    for lca_filename in args.lca:
+        print('loading LCA database from {}'.format(lca_filename))
+        lca_db = lca_json.LCA_Database(lca_filename)
+        taxfoo, hashval_to_lca, _ = lca_db.get_database(args.ksize, SCALED)
+        lca_db_list.append((taxfoo, hashval_to_lca))
+    
     # reverse index names -> taxids
     names_to_taxids = defaultdict(set)
     for taxid, (name, _, _) in taxfoo.taxid_to_names.items():
@@ -215,10 +222,10 @@ def main():
     ## next phase: collapse lineages etc.
 
     ## load revindex
-
     print('loading reverse index:', args.revindex)
     custom_bins_ri = revindex_utils.HashvalRevindex(args.revindex)
 
+    # load the signatures associated with each revindex.
     print('loading signatures for custom genomes...')
     custom_sigs = {}
     sigids_to_sig = {}
@@ -228,8 +235,8 @@ def main():
             custom_sigs[md5] = sig
             sigids_to_sig[sigid] = sig
 
-    # figure out what ksize we're talking about here! this should
-    # probably be stored on the revindex...
+    # figure out what ksize we're talking about here! (this should
+    # probably be stored on the revindex...)
     random_db_sig = next(iter(sigids_to_sig.values()))
     ksize = random_db_sig.minhash.ksize
 

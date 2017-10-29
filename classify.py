@@ -58,7 +58,7 @@ def main():
     siglist = []
     print('loading signatures from {} signature files'.format(len(args.sigfiles)))
     for sigfile in args.sigfiles:
-        sigs = sourmash_lib.load_signatures(sigfile, select_ksize=args.ksize)
+        sigs = sourmash_lib.load_signatures(sigfile, ksize=args.ksize)
         sigs = list(sigs)
         siglist.extend(sigs)
 

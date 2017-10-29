@@ -312,17 +312,50 @@ def main():
                 lca = k
                 counts[lca] += 1
 
+            # ok, we now have the LCAs for each hashval, and their number
+            # of counts. Now sum across LCAs.
+
+            tree = {}
+            tree_counts = defaultdict(int)
+
+            n = 0
             for lca, count in counts.most_common():
                 if count < THRESHOLD:
                     break
+
+                n += 1
 
                 xx = []
                 parent = lca
                 while parent:
                     xx.insert(0, parent)
+                    tree_counts[parent] += count
                     parent = parents.get(parent)
-                print(count, xx)
+                print(n, count, xx[1:])
 
+                node = tree
+                last_node = ('root', 'root')
+                for rank, name in xx:
+                    x = node.get((rank, name), {})
+                    node[(rank, name)] = x
+                    node = x
+
+            if n > 1:
+                print('XXX', n)
+
+            # now find LCA? or whatever.
+            node = tree
+            k = ('root', 'root')
+            while 1:
+                if len(node) == 1:
+                    k = next(iter(node.keys()))
+                    node = node[k]
+                elif len(node) == 0:
+                    print('END', k)
+                    break
+                elif len(node) > 1:
+                    print('MULTI', k, node)
+                    break
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -9,7 +9,7 @@ from collections import defaultdict, Counter
 import itertools
 import pprint
 import sourmash_lib
-import pickle
+import json
 
 sys.path.insert(0, '../2017-sourmash-revindex')
 import revindex_utils
@@ -122,17 +122,17 @@ def main():
                 idx = next_lineage_index
                 next_lineage_index += 1
 
-                lineage_dict[lineage_tuple] = idx
+                lineage_dict[idx] = lineage_tuple
 
             hashval_to_custom_idx[hashval].append(idx)
 
-    print(next(iter(hashval_to_custom_idx.items())))
-    print(next(iter(lineage_dict.items())))
-
     # whew! done!! we can now go from a hashval to a custom assignment!!
     print('saving to LCA DB v2: {}'.format(args.lca_db))
-    with open(args.lca_db, 'wb') as fp:
-        pickle.dump((ksize, scaled, hashval_to_custom), fp)
+    with open(args.lca_db, 'wt') as fp:
+        save_d = dict(ksize=ksize, scaled=scaled, lineages=lineage_dict,
+                      hashval_assignments=hashval_to_custom_idx)
+        print(save_d)
+        json.dump([save_d], fp)
 
 
 if __name__ == '__main__':

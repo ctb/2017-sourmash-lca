@@ -9,7 +9,7 @@ from collections import defaultdict, Counter
 import itertools
 import pprint
 import sourmash_lib
-import pickle
+import json
 
 DEFAULT_THRESHOLD=5                  # how many counts of a taxid at min
 
@@ -182,8 +182,24 @@ def main():
         print(u'\r\033[K', end=u'', file=sys.stderr)
         print('... loading database {}'.format(db_name), end='\r',
               file=sys.stderr)
-        with open(db_name, 'rb') as fp:
-            (ksize, scaled, hashval_to_lineage) = pickle.load(fp)
+
+        with open(db_name, 'rt') as fp:
+            load_d, = json.load(fp)
+            ksize = load_d['ksize']
+            scaled = load_d['scaled']
+
+            lineage_dict_2 = load_d['lineages']
+            lineage_dict = {}
+            for k, v in lineage_dict_2.items():
+                lineage_dict[int(k)] = tuple( ( tuple(vv) for vv in v ) )
+
+            hashval_to_lineage_id_2 = load_d['hashval_assignments']
+            hashval_to_lineage_id = {}
+            for k, v in hashval_to_lineage_id_2.items():
+                hashval_to_lineage_id[int(k)] = v
+
+            debug(next(iter(lineage_dict.items())))
+            debug(next(iter(hashval_to_lineage_id.items())))
 
         ksize_vals.add(ksize)
         if len(ksize_vals) > 1:
@@ -192,7 +208,7 @@ def main():
         if len(scaled_vals) > 1:
             raise Exception('multiple scaled vals, quitting')
 
-        dblist.append(hashval_to_lineage)
+        dblist.append((lineage_dict, hashval_to_lineage_id))
 
     print(u'\r\033[K', end=u'', file=sys.stderr)
     print('loaded {} databases for LCA use.'.format(len(dblist)))
@@ -223,10 +239,11 @@ def main():
             these_assignments = defaultdict(list)
             n_custom = 0
             for hashval in query_sig.minhash.get_mins():
-                for hashval_to_custom in dblist:
-                    assignment = hashval_to_custom.get(hashval, [])
-                    if assignment:
-                        these_assignments[hashval].extend(assignment)
+                for (lineage_dict, hashval_to_lineage_id) in dblist:
+                    assignments = hashval_to_lineage_id.get(hashval, [])
+                    for lineage_id in assignments:
+                        assignment = lineage_dict[lineage_id]
+                        these_assignments[hashval].append(assignment)
                         n_custom += 1
 
             # count number of assignments for each most-specific

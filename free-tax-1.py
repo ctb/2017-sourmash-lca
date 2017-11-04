@@ -76,7 +76,13 @@ def main():
     print('loading signatures for custom genomes...', file=sys.stderr)
     sigids_to_sig = {}
     ksizes = set()
+
+    n = 0
+    total_n = len(custom_bins_ri.sigid_to_siginfo)
     for sigid, (filename, md5) in custom_bins_ri.sigid_to_siginfo.items():
+        n += 1
+        print(u'\r\033[K', end=u'', file=sys.stderr)
+        print('... loading from {} ({} of {})'.format(filename, n, total_n), end='\r',file=sys.stderr)
         sig = revindex_utils.get_sourmash_signature(filename, md5)
 
         # downsample to specified scaled; this has the side effect of
@@ -131,7 +137,6 @@ def main():
     with open(args.lca_db, 'wt') as fp:
         save_d = dict(ksize=ksize, scaled=scaled, lineages=lineage_dict,
                       hashval_assignments=hashval_to_custom_idx)
-        print(save_d)
         json.dump([save_d], fp)
 
 

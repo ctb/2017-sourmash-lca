@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 """
-Load a genbank-free lineage, anchor with genbank.
+...
+
+TODO:
+* check if we've already seen this md5sum?
 """
 import sys
 import argparse

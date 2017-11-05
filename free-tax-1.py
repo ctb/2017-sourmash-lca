@@ -151,6 +151,7 @@ def main():
         save_d = OrderedDict()
         save_d['version'] = '1.0'
         save_d['type'] = 'sourmash_lca'
+        save_d['license'] = 'CC0'
         save_d['ksize'] = ksize
         save_d['scaled'] = scaled
         # convert lineage internals from tuples to dictionaries

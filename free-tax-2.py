@@ -184,14 +184,25 @@ def main():
               file=sys.stderr)
 
         with open(db_name, 'rt') as fp:
-            load_d, = json.load(fp)
+            load_d = json.load(fp)
+            version = load_d['version']
+            assert version == '1.0'
+
+            type = load_d['type']
+            assert type == 'sourmash_lca'
+
             ksize = load_d['ksize']
             scaled = load_d['scaled']
 
             lineage_dict_2 = load_d['lineages']
             lineage_dict = {}
             for k, v in lineage_dict_2.items():
-                lineage_dict[int(k)] = tuple( ( tuple(vv) for vv in v ) )
+                vv = []
+                for rank in taxlist:
+                    name = v.get(rank, '')
+                    vv.append((rank, name))
+                    
+                lineage_dict[int(k)] = tuple(vv)
 
             hashval_to_lineage_id_2 = load_d['hashval_assignments']
             hashval_to_lineage_id = {}

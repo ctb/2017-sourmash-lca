@@ -5,7 +5,7 @@ Load a genbank-free lineage, anchor with genbank.
 import sys
 import argparse
 import csv
-from collections import defaultdict, Counter
+from collections import defaultdict, Counter, OrderedDict
 import itertools
 import pprint
 import sourmash_lib
@@ -28,15 +28,19 @@ def debug(*args):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('csv')
-    p.add_argument('revindex')
-    p.add_argument('lca_db')
+    p.add_argument('lca_db_out')
+    p.add_argument('genome_sigs', nargs='+')
     p.add_argument('--scaled', default=10000, type=float)
+    p.add_argument('-k', '--ksize', default=31, type=int)
     p.add_argument('-d', '--debug', action='store_true')
     args = p.parse_args()
 
     if args.debug:
         global _print_debug
         _print_debug = True
+
+    scaled = int(args.scaled)
+    ksize = int(args.ksize)
 
     ### parse spreadsheet
     r = csv.reader(open(args.csv, 'rt'))
@@ -66,78 +70,67 @@ def main():
         # clean lineage of null names
         lineage = [(a,b) for (a,b) in lineage if b not in null_names]
 
+        # convert to dictionary
+
         assignments[ident] = tuple(lineage)
 
-    ## load revindex
-    print('loading reverse index:', args.revindex, file=sys.stderr)
-    custom_bins_ri = revindex_utils.HashvalRevindex(args.revindex)
-
-    # load the signatures associated with each revindex.
-    print('loading signatures for custom genomes...', file=sys.stderr)
-    sigids_to_sig = {}
-    ksizes = set()
-
-    n = 0
-    total_n = len(custom_bins_ri.sigid_to_siginfo)
-    for sigid, (filename, md5) in custom_bins_ri.sigid_to_siginfo.items():
-        n += 1
-        print(u'\r\033[K', end=u'', file=sys.stderr)
-        print('... loading from {} ({} of {})'.format(filename, n, total_n), end='\r',file=sys.stderr)
-        sig = revindex_utils.get_sourmash_signature(filename, md5)
-
-        # downsample to specified scaled; this has the side effect of
-        # making sure they're all at the same scaled value!
-        sig.minhash = sig.minhash.downsample_scaled(args.scaled)
-
-        # check if there's more than one ksize...
-        ksizes.add(sig.minhash.ksize)
-        if len(ksizes) > 1:
-            raise Exception('ERROR: multiple ksizes!? {}'.format(str(ksizes)))
-            
-        if sig.name() in assignments:
-            sigids_to_sig[sigid] = sig
-        else:
-            debug('no assignment:', sig.name())
-
-    if not len(sigids_to_sig):
-        raise Exception('no custom genomes with assignments!?')
-
-    print('...found {} custom genomes in revindex with assignments!!'.format(len(sigids_to_sig)), file=sys.stderr)
-
-    ksize = ksizes.pop()
-    scaled = int(args.scaled)
-
-    ## now, connect the dots: hashvals to custom classifications
-    hashval_to_custom = defaultdict(list)
-    for hashval, sigids in custom_bins_ri.hashval_to_sigids.items():
-        for sigid in sigids:
-            sig = sigids_to_sig.get(sigid, None)
-            if sig:
-                assignment = assignments[sig.name()]
-                hashval_to_custom[hashval].append(assignment)
-
-    ## clean up with some indirection
+    ## clean up with some indirection: convert lineages to numbers
     next_lineage_index = 0
     lineage_dict = {}
-    hashval_to_custom_idx = defaultdict(list)
-    
-    for hashval, assignments in hashval_to_custom.items():
-        for lineage_tuple in assignments:
-            idx = lineage_dict.get(lineage_tuple)
-            if idx is None:
-                idx = next_lineage_index
-                next_lineage_index += 1
 
-                lineage_dict[idx] = lineage_tuple
+    assignments_idx = {}
+    for (ident, lineage_tuple) in assignments.items():
+        idx = lineage_dict.get(lineage_tuple)
+        if idx is None:
+            idx = next_lineage_index
+            next_lineage_index += 1
 
-            hashval_to_custom_idx[hashval].append(idx)
+            lineage_dict[idx] = lineage_tuple
 
-    # whew! done!! we can now go from a hashval to a custom assignment!!
-    print('saving to LCA DB v2: {}'.format(args.lca_db))
-    with open(args.lca_db, 'wt') as fp:
-        save_d = dict(ksize=ksize, scaled=scaled, lineages=lineage_dict,
-                      hashval_assignments=hashval_to_custom_idx)
-        json.dump([save_d], fp)
+        assignments_idx[ident] = idx
+
+    # load signatures, construct index of hashvals to lineages
+    hashval_to_lineage = defaultdict(list)
+    md5_to_lineage = {}
+
+    n = 0
+    total_n = len(args.genome_sigs)
+    for filename in args.genome_sigs:
+        for sig in sourmash_lib.load_signatures(filename, ksize=args.ksize):
+            print(u'\r\033[K', end=u'', file=sys.stderr)
+            print('... loading signature {} (file {} of {})'.format(sig.name(), n, total_n), end='\r',file=sys.stderr)
+
+            # is this one for which we have a lineage assigned?
+            lineage_idx = assignments_idx.get(sig.name())
+            if lineage_idx:
+                # downsample to specified scaled; this has the side effect of
+                # making sure they're all at the same scaled value!
+                sig.minhash = sig.minhash.downsample_scaled(args.scaled)
+
+                # connect hashvals to lineage
+                for hashval in sig.minhash.get_mins():
+                    hashval_to_lineage[hashval].append(lineage_idx)
+
+                # store md5 -> lineage too
+                md5_to_lineage[sig.md5sum()] = lineage_idx
+
+    print(u'\r\033[K', end=u'', file=sys.stderr)
+    print('...found {} genomes with lineage assignments!!'.format(len(md5_to_lineage)), file=sys.stderr)
+
+    # now, save!
+    print('saving to LCA DB v2: {}'.format(args.lca_db_out))
+    with open(args.lca_db_out, 'wt') as fp:
+        save_d = OrderedDict()
+        save_d['version'] = '1.0'
+        save_d['type'] = 'sourmash_lca'
+        save_d['ksize'] = ksize
+        save_d['scaled'] = scaled
+        # convert lineage internals from tuples to dictionaries
+        save_d['lineages'] = OrderedDict([ (k, OrderedDict(v)) \
+                                           for k, v in lineage_dict.items() ])
+        save_d['hashval_assignments'] = hashval_to_lineage
+        save_d['signatures_to_lineage'] = md5_to_lineage
+        json.dump(save_d, fp)
 
 
 if __name__ == '__main__':

@@ -213,6 +213,96 @@ class LCA_Database(object):
         self.signatures_to_lineage = signatures_to_lineage
 
 
+def classify_signature(query_sig, dblist, threshold):
+    # gather assignments from across all the databases
+    these_assignments = defaultdict(list)
+    n_custom = 0
+    for hashval in query_sig.minhash.get_mins():
+        for lca_db in dblist:
+            assignments = lca_db.hashval_to_lineage_id.get(hashval, [])
+            for lineage_id in assignments:
+                assignment = lca_db.lineage_dict[lineage_id]
+                these_assignments[hashval].append(assignment)
+                n_custom += 1
+
+    # count number of assignments for each most-specific
+    check_counts = Counter()
+    for tuple_info in these_assignments.values():
+        last_tup = tuple(tuple_info[-1])
+        check_counts[last_tup] += 1
+
+    debug('n custom hashvals:', n_custom)
+    debug(pprint.pformat(check_counts.most_common()))
+
+    # now convert to trees -> do LCA & counts
+    counts = Counter()
+    parents = {}
+    for hashval in these_assignments:
+
+        # for each list of tuple_info [(rank, name), ...] build
+        # a tree that lets us discover least-common-ancestor.
+        tuple_info = these_assignments[hashval]
+        tree = build_tree(tuple_info)
+
+        # also update a tree that we can ascend from leaves -> parents
+        # for all assignments for all hashvals
+        parents = build_reverse_tree(tuple_info, parents)
+
+        # now find either a leaf or the first node with multiple
+        # children; that's our least-common-ancestor node.
+        lca, reason = find_lca(tree)
+        counts[lca] += 1
+
+    # ok, we now have the LCAs for each hashval, and their number
+    # of counts. Now sum across "significant" LCAs - those above
+    # threshold.
+
+    tree = {}
+    tree_counts = defaultdict(int)
+
+    debug(pprint.pformat(counts.most_common()))
+
+    n = 0
+    for lca, count in counts.most_common():
+        if count < threshold:
+            break
+
+        n += 1
+
+        xx = []
+        parent = lca
+        while parent:
+            xx.insert(0, parent)
+            tree_counts[parent] += count
+            parent = parents.get(parent)
+        debug(n, count, xx[1:])
+
+        # update tree with this set of assignments
+        build_tree([xx], tree)
+
+    if n > 1:
+        debug('XXX', n)
+
+    # now find LCA? or whatever.
+    lca, reason = find_lca(tree)
+    if reason == 0:               # leaf node
+        debug('END', lca)
+    else:                         # internal node
+        debug('MULTI', lca)
+
+    # backtrack to full lineage via parents
+    lineage = []
+    parent = lca
+    while parent != ('root', 'root'):
+        lineage.insert(0, parent)
+        parent = parents.get(parent)
+
+    debug(parents)
+    debug('lineage is:', lineage)
+
+    return lineage
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--db', nargs='+', action='append')
@@ -270,11 +360,14 @@ def main():
     csvfp.writerow(['ID'] + taxlist)
 
     total_count = 0
+    n = 0
+    total_n = len(args.query)
     for query_filename in args.query:
+        n += 1
         for query_sig in sourmash_lib.load_signatures(query_filename,
                                                       ksize=ksize):
             print(u'\r\033[K', end=u'', file=sys.stderr)
-            print('... classifying {}'.format(query_sig.name()), end='\r',
+            print('... classifying {} (file {} of {})'.format(query_sig.name(), n, total_n), end='\r',
                   file=sys.stderr)
             debug('classifying', query_sig.name())
             total_count += 1
@@ -282,91 +375,7 @@ def main():
             # make sure we're looking at the same scaled value as database
             query_sig.minhash = query_sig.minhash.downsample_scaled(scaled)
 
-            # gather assignments from across all the databases
-            these_assignments = defaultdict(list)
-            n_custom = 0
-            for hashval in query_sig.minhash.get_mins():
-                for lca_db in dblist:
-                    assignments = lca_db.hashval_to_lineage_id.get(hashval, [])
-                    for lineage_id in assignments:
-                        assignment = lca_db.lineage_dict[lineage_id]
-                        these_assignments[hashval].append(assignment)
-                        n_custom += 1
-
-            # count number of assignments for each most-specific
-            check_counts = Counter()
-            for tuple_info in these_assignments.values():
-                last_tup = tuple(tuple_info[-1])
-                check_counts[last_tup] += 1
-
-            debug('n custom hashvals:', n_custom)
-            debug(pprint.pformat(check_counts.most_common()))
-
-            # now convert to trees -> do LCA & counts
-            counts = Counter()
-            parents = {}
-            for hashval in these_assignments:
-
-                # for each list of tuple_info [(rank, name), ...] build
-                # a tree that lets us discover least-common-ancestor.
-                tuple_info = these_assignments[hashval]
-                tree = build_tree(tuple_info)
-
-                # also update a tree that we can ascend from leaves -> parents
-                # for all assignments for all hashvals
-                parents = build_reverse_tree(tuple_info, parents)
-
-                # now find either a leaf or the first node with multiple
-                # children; that's our least-common-ancestor node.
-                lca, reason = find_lca(tree)
-                counts[lca] += 1
-
-            # ok, we now have the LCAs for each hashval, and their number
-            # of counts. Now sum across "significant" LCAs - those above
-            # threshold.
-
-            tree = {}
-            tree_counts = defaultdict(int)
-
-            debug(pprint.pformat(counts.most_common()))
-
-            n = 0
-            for lca, count in counts.most_common():
-                if count < args.threshold:
-                    break
-
-                n += 1
-
-                xx = []
-                parent = lca
-                while parent:
-                    xx.insert(0, parent)
-                    tree_counts[parent] += count
-                    parent = parents.get(parent)
-                debug(n, count, xx[1:])
-
-                # update tree with this set of assignments
-                build_tree([xx], tree)
-
-            if n > 1:
-                debug('XXX', n)
-
-            # now find LCA? or whatever.
-            lca, reason = find_lca(tree)
-            if reason == 0:               # leaf node
-                debug('END', lca)
-            else:                         # internal node
-                debug('MULTI', lca)
-
-            # backtrack to full lineage via parents
-            lineage = []
-            parent = lca
-            while parent != ('root', 'root'):
-                lineage.insert(0, parent)
-                parent = parents.get(parent)
-
-            debug(parents)
-            debug('lineage is:', lineage)
+            lineage = classify_signature(query_sig, dblist, args.threshold)
 
             # output!
             row = [query_sig.name()]

@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 """
+Build a least-common-ancestor database with given taxonomy and genome sigs.
 
+TODO:
+* add --traverse
 """
 import sys
 import argparse
@@ -111,6 +114,7 @@ def main():
     n = 0
     total_n = len(args.genome_sigs)
     for filename in args.genome_sigs:
+        n += 1
         for sig in sourmash_lib.load_signatures(filename, ksize=args.ksize):
             print(u'\r\033[K', end=u'', file=sys.stderr)
             print('... loading signature {} (file {} of {})'.format(sig.name(), n, total_n), end='\r',file=sys.stderr)

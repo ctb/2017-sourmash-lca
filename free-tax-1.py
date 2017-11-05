@@ -1,18 +1,14 @@
 #! /usr/bin/env python
 """
-Load a genbank-free lineage, anchor with genbank.
+
 """
 import sys
 import argparse
 import csv
-from collections import defaultdict, Counter, OrderedDict
-import itertools
-import pprint
-import sourmash_lib
+from collections import defaultdict, OrderedDict
 import json
 
-sys.path.insert(0, '../2017-sourmash-revindex')
-import revindex_utils
+import sourmash_lib
 
 taxlist = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus',
            'species']
@@ -33,7 +29,14 @@ def main():
     p.add_argument('--scaled', default=10000, type=float)
     p.add_argument('-k', '--ksize', default=31, type=int)
     p.add_argument('-d', '--debug', action='store_true')
+    p.add_argument('-1', '--start-column', default=2, type=int,
+                   help='column at which taxonomic assignments start')
+    p.add_argument('-f', '--force', action='store_true')
     args = p.parse_args()
+
+    if args.start_column < 2:
+        print('error, --start-column cannot be less than 2', file=sys.stderr)
+        sys.exit(-1)
 
     if args.debug:
         global _print_debug
@@ -42,27 +45,38 @@ def main():
     scaled = int(args.scaled)
     ksize = int(args.ksize)
 
-    ### parse spreadsheet
+    # parse spreadsheet!
     r = csv.reader(open(args.csv, 'rt'))
-    row_headers = ['identifier'] + taxlist
+    row_headers = ['identifiers']
+    row_headers += ['_skip_']*(args.start_column - 2)
+    row_headers += taxlist
 
+    # first check that headers are interpretable.
     print('examining spreadsheet headers...', file=sys.stderr)
     first_row = next(iter(r))
 
     n_disagree = 0
     for (column, value) in zip(row_headers, first_row):
+        if column == '_skip_':
+            continue
+
         if column.lower() != value.lower():
-            print('** assuming {} == {} in spreadsheet'.format(column, value),
+            print("** assuming column '{}' is {} in spreadsheet".format(value, column),
                   file=sys.stderr)
             n_disagree += 1
             if n_disagree > 2:
                 print('whoa, too many assumptions. are the headers right?',
                       file=sys.stderr)
-                sys.exit(-1)
+                if not args.force:
+                    sys.exit(-1)
+                print('...continue, because --force was specified.',
+                      file=sys.argv)
 
+    # convert 
     assignments = {}
     for row in r:
         lineage = list(zip(row_headers, row))
+        lineage = [ x for x in lineage if x[0] != '_skip_' ]
 
         ident = lineage[0][1]
         lineage = lineage[1:]
@@ -70,11 +84,10 @@ def main():
         # clean lineage of null names
         lineage = [(a,b) for (a,b) in lineage if b not in null_names]
 
-        # convert to dictionary
-
+        # store lineage tuple
         assignments[ident] = tuple(lineage)
 
-    ## clean up with some indirection: convert lineages to numbers
+    # clean up with some indirection: convert lineages to numbers.
     next_lineage_index = 0
     lineage_dict = {}
 

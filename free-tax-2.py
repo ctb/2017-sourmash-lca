@@ -155,6 +155,50 @@ def test_build_reverse_tree_3():
                         ('rank1', 'name1'): ('root', 'root') }
 
 
+class LCA_Database(object):
+    def __init__(self):
+        self.lineage_dict = None
+        self.hashval_to_lineage_id = None
+        self.ksize = None
+        self.scaled = None
+        self.signatures_to_lineage = None
+
+    def load(self, db_name):
+        with open(db_name, 'rt') as fp:
+            load_d = json.load(fp)
+            version = load_d['version']
+            assert version == '1.0'
+
+            type = load_d['type']
+            assert type == 'sourmash_lca'
+
+            ksize = load_d['ksize']
+            scaled = load_d['scaled']
+
+            lineage_dict_2 = load_d['lineages']
+            lineage_dict = {}
+            for k, v in lineage_dict_2.items():
+                vv = []
+                for rank in taxlist:
+                    name = v.get(rank, '')
+                    vv.append((rank, name))
+
+                lineage_dict[int(k)] = tuple(vv)
+
+            hashval_to_lineage_id_2 = load_d['hashval_assignments']
+            hashval_to_lineage_id = {}
+            for k, v in hashval_to_lineage_id_2.items():
+                hashval_to_lineage_id[int(k)] = v
+
+            signatures_to_lineage = load_d['signatures_to_lineage']
+
+        self.lineage_dict = lineage_dict
+        self.hashval_to_lineage_id = hashval_to_lineage_id
+        self.ksize = ksize
+        self.scaled = scaled
+        self.signatures_to_lineage = signatures_to_lineage
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--db', nargs='+', action='append')
@@ -183,46 +227,24 @@ def main():
         print('... loading database {}'.format(db_name), end='\r',
               file=sys.stderr)
 
-        with open(db_name, 'rt') as fp:
-            load_d = json.load(fp)
-            version = load_d['version']
-            assert version == '1.0'
+        lca_db = LCA_Database()
+        lca_db.load(db_name)
 
-            type = load_d['type']
-            assert type == 'sourmash_lca'
-
-            ksize = load_d['ksize']
-            scaled = load_d['scaled']
-
-            lineage_dict_2 = load_d['lineages']
-            lineage_dict = {}
-            for k, v in lineage_dict_2.items():
-                vv = []
-                for rank in taxlist:
-                    name = v.get(rank, '')
-                    vv.append((rank, name))
-                    
-                lineage_dict[int(k)] = tuple(vv)
-
-            hashval_to_lineage_id_2 = load_d['hashval_assignments']
-            hashval_to_lineage_id = {}
-            for k, v in hashval_to_lineage_id_2.items():
-                hashval_to_lineage_id[int(k)] = v
-
-            debug(next(iter(lineage_dict.items())))
-            debug(next(iter(hashval_to_lineage_id.items())))
-
-        ksize_vals.add(ksize)
+        ksize_vals.add(lca_db.ksize)
         if len(ksize_vals) > 1:
             raise Exception('multiple ksizes, quitting')
-        scaled_vals.add(scaled)
+        scaled_vals.add(lca_db.scaled)
         if len(scaled_vals) > 1:
             raise Exception('multiple scaled vals, quitting')
 
-        dblist.append((lineage_dict, hashval_to_lineage_id))
+        dblist.append(lca_db)
 
     print(u'\r\033[K', end=u'', file=sys.stderr)
     print('loaded {} databases for LCA use.'.format(len(dblist)))
+
+    ksize = ksize_vals.pop()
+    scaled = scaled_vals.pop()
+    print('ksize={} scaled={}'.format(ksize, scaled))
         
     # for each query, gather all the matches across databases, then
     csvfp = csv.writer(sys.stdout)
@@ -250,10 +272,10 @@ def main():
             these_assignments = defaultdict(list)
             n_custom = 0
             for hashval in query_sig.minhash.get_mins():
-                for (lineage_dict, hashval_to_lineage_id) in dblist:
-                    assignments = hashval_to_lineage_id.get(hashval, [])
+                for lca_db in dblist:
+                    assignments = lca_db.hashval_to_lineage_id.get(hashval, [])
                     for lineage_id in assignments:
-                        assignment = lineage_dict[lineage_id]
+                        assignment = lca_db.lineage_dict[lineage_id]
                         these_assignments[hashval].append(assignment)
                         n_custom += 1
 

@@ -92,13 +92,15 @@ def main():
     lineage_dict = {}
 
     assignments_idx = {}
+    lineage_to_idx = {}
     for (ident, lineage_tuple) in assignments.items():
-        idx = lineage_dict.get(lineage_tuple)
+        idx = lineage_to_idx.get(lineage_tuple)
         if idx is None:
             idx = next_lineage_index
             next_lineage_index += 1
 
             lineage_dict[idx] = lineage_tuple
+            lineage_to_idx[lineage_tuple] = idx
 
         assignments_idx[ident] = idx
 
@@ -115,7 +117,7 @@ def main():
 
             # is this one for which we have a lineage assigned?
             lineage_idx = assignments_idx.get(sig.name())
-            if lineage_idx:
+            if lineage_idx is not None:
                 # downsample to specified scaled; this has the side effect of
                 # making sure they're all at the same scaled value!
                 sig.minhash = sig.minhash.downsample_scaled(args.scaled)
@@ -129,6 +131,15 @@ def main():
 
     print(u'\r\033[K', end=u'', file=sys.stderr)
     print('...found {} genomes with lineage assignments!!'.format(len(md5_to_lineage)), file=sys.stderr)
+
+    # remove those lineages with no genomes associated
+    assigned_lineages = set(md5_to_lineage.values())
+    lineage_dict_2 = {}
+    for idx in assigned_lineages:
+        lineage_dict_2[idx] = lineage_dict[idx]
+
+    print('{} assigned lineages out of {} distinct lineages in spreadsheet'.format(len(lineage_dict_2), len(lineage_dict)))
+    lineage_dict = lineage_dict_2
 
     # now, save!
     print('saving to LCA DB v2: {}'.format(args.lca_db_out))

@@ -37,11 +37,12 @@ def build_tree(assignments, initial=None):
         node = tree
 
         for rank, name in assignment:
-            child = node.get((rank, name), {})
-            node[(rank, name)] = child
+            if name:
+                child = node.get((rank, name), {})
+                node[(rank, name)] = child
 
-            # shift -> down in tree
-            node = child
+                # shift -> down in tree
+                node = child
 
     return tree
 
@@ -60,7 +61,12 @@ def test_build_tree_2():
                                            ('rank2', 'name2b') : {}} }
 
 
-def test_build_tree_3():
+def test_build_tree_3():                  # empty 'rank2' name
+    tree = build_tree([[('rank1', 'name1'), ('rank2', '')]])
+    assert tree == { ('rank1', 'name1'): {} }
+
+
+def test_build_tree_4():
     tree = build_tree([[('rank1', 'name1'), ('rank2', 'name2a')],
                       ])
 
@@ -120,8 +126,9 @@ def build_reverse_tree(assignments, initial=None):
     for assignment in assignments:
         last_node = ('root', 'root')
         for rank, name in assignment:
-            parents[(rank, name)] = last_node
-            last_node = (rank, name)
+            if name:
+                parents[(rank, name)] = last_node
+                last_node = (rank, name)
 
     return parents
 
@@ -153,6 +160,13 @@ def test_build_reverse_tree_3():
     assert parents == { ('rank2', 'name2a'): ('rank1', 'name1'),
                         ('rank2', 'name2b'): ('rank1', 'name1'),
                         ('rank1', 'name1'): ('root', 'root') }
+
+
+def test_build_reverse_tree_4():          # empty 'rank2' name
+    parents = build_reverse_tree([[('rank1', 'name1'), ('rank2', '')]])
+
+    print(parents)
+    assert parents == { ('rank1', 'name1'): ('root', 'root') }
 
 
 class LCA_Database(object):
@@ -350,6 +364,9 @@ def main():
             while parent != ('root', 'root'):
                 lineage.insert(0, parent)
                 parent = parents.get(parent)
+
+            debug(parents)
+            debug('lineage is:', lineage)
 
             # output!
             row = [query_sig.name()]
